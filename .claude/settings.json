@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node scripts/validate_palette.js \"#7c3aed,#d03b3b\" --mode light --pairs all)",
+      "Bash(node scripts/validate_palette.js \"#b694f3,#9a6bef,#7c3aed,#5b21b6,#3b1680\" --mode light --ordinal)",
+      "Bash(npm run *)"
+    ]
+  }
+}

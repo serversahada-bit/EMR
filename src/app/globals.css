@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────────────────────
+   Design token — Executive Management Report
+   Tema terang (light-only). Semua warna didefinisikan sekali di
+   sini; komponen memakainya lewat peran, bukan hex mentah.
+   ────────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+
+  /* Permukaan — putih, dengan latar halaman berpendar ungu tipis */
+  --page: #f8f7fc;          /* latar halaman */
+  --surface: #fcfcfb;       /* permukaan kartu & chart (acuan validasi) */
+  --surface-sunken: #f3f1f8; /* header tabel, tombol segmented */
+
+  /* Tinta teks */
+  --ink: #0b0b0b;           /* primer */
+  --ink-2: #52514e;         /* sekunder */
+  --ink-muted: #898781;     /* label sumbu, caption */
+
+  /* Chrome chart */
+  --grid: #e1e0d9;          /* gridline hairline */
+  --axis: #c3c2b7;          /* baseline / sumbu */
+  --border: rgba(11, 11, 11, 0.1);
+  --demph: #c3c2b7;         /* seri konteks (de-emphasis) */
+
+  /* Palet kategorikal — urutan slot tetap, tidak pernah diputar.
+     Slot 1 memakai ungu merek PT SLU. Seluruh set lolos validasi
+     pada permukaan #fcfcfb: pita terang, ambang chroma, pemisahan
+     CVD pasangan bersebelahan (terburuk ΔE 9,1), dan ambang
+     penglihatan normal (terburuk ΔE 19,6). Tiga slot pertama juga
+     lolos pairlist penuh untuk scatter / small multiples. */
+  --s1: #7c3aed;  /* ungu    */
+  --s2: #eb6834;  /* oranye  */
+  --s3: #1baf7a;  /* aqua    */
+  --s4: #eda100;  /* kuning  */
+  --s5: #e87ba4;  /* magenta */
+
+  /* Ramp sekuensial (ungu) — untuk magnitudo & skala ordinal.
+     Ujung terang ordinal adalah --seq-250 (2,40:1 di atas
+     permukaan, lolos ambang 2:1); --seq-100 hanya track meter. */
+  --seq-100: #e9ddfd;
+  --seq-250: #b694f3;
+  --seq-350: #9a6bef;
+  --seq-450: #7c3aed;
+  --seq-550: #5b21b6;
+  --seq-650: #3b1680;
+
+  /* Kutub diverging: ungu ↔ merah (dingin vs hangat, ΔE CVD 28,5),
+     titik tengah netral tanpa hue. */
+  --div-pos: #7c3aed;
+  --div-neg: #d03b3b;
+  --div-mid: #f0efec;
+
+  /* Palet status — tidak pernah dipakai sebagai warna seri */
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --delta-up: #006300;      /* teks delta positif */
+  --delta-down: #d03b3b;    /* teks delta negatif */
+
+  /* Latar lunak untuk kotak ikon & pil status — diturunkan dari
+     hue yang sama agar tidak menambah warna baru ke sistem. */
+  --tint-s1: color-mix(in oklab, var(--s1) 12%, var(--surface));
+  --tint-s2: color-mix(in oklab, var(--s2) 12%, var(--surface));
+  --tint-s3: color-mix(in oklab, var(--s3) 14%, var(--surface));
+  --tint-s4: color-mix(in oklab, var(--s4) 16%, var(--surface));
+  --tint-s5: color-mix(in oklab, var(--s5) 14%, var(--surface));
+
+  /* Pil status: latar lunak + tinta gelap agar teks lolos kontras.
+     Warna tinta ini adalah token teks, bukan warna seri. */
+  --good-bg: color-mix(in oklab, var(--good) 14%, var(--surface));
+  --good-fg: #006300;
+  --warning-bg: color-mix(in oklab, var(--warning) 20%, var(--surface));
+  --warning-fg: #6b4a00;
+  --serious-bg: color-mix(in oklab, var(--serious) 18%, var(--surface));
+  --serious-fg: #8f3c13;
+  --critical-bg: color-mix(in oklab, var(--critical) 12%, var(--surface));
+  --critical-fg: #a52222;
+
+  /* Rail sidebar */
+  --rail: #ffffff;
+  --rail-active: color-mix(in oklab, var(--s1) 10%, #ffffff);
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-sunken: var(--surface-sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--ink-muted);
+  --color-grid: var(--grid);
+  --color-axis: var(--axis);
+  --color-hairline: var(--border);
+  --color-rail: var(--rail);
+  --color-good: var(--good);
+  --color-warning: var(--warning);
+  --color-serious: var(--serious);
+  --color-critical: var(--critical);
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html {
+  background: var(--page);
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Angka pada kolom tabel & tick sumbu harus sejajar vertikal.
+   Angka besar (hero, nilai stat tile) tetap proporsional. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
