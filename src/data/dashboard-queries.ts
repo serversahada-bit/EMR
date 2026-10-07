@@ -124,11 +124,15 @@ export async function trenDashboard(
       [awal, akhir],
     ),
     query<Record<string, unknown>>(
+      /* Group berdasarkan ekspresi penuh, bukan alias `bulan`: tabel ini
+         punya kolom asli bernama `bulan` (berisi nama bulan seperti
+         "Januari"), dan MySQL menafsirkan `GROUP BY bulan` sebagai kolom
+         itu — menggabung lintas tahun sekaligus melanggar ONLY_FULL_GROUP_BY. */
       `SELECT DATE_FORMAT(tanggal, '%Y-%m') AS bulan,
               SUM(spend_iklan) AS spend
        FROM data_spend_meta_harian
        WHERE tanggal >= ? AND tanggal < ?
-       GROUP BY bulan`,
+       GROUP BY DATE_FORMAT(tanggal, '%Y-%m')`,
       [awal, akhir],
     ),
   ]);
