@@ -64,7 +64,7 @@ function labelDari(tabel: string): string {
 /** Tabel marketplace yang benar-benar ada di database. */
 export async function sumberMp(): Promise<SumberMp[]> {
   const baris = await query<{ table_name: string }>(
-    `SELECT table_name
+    `SELECT table_name AS table_name
        FROM information_schema.tables
       WHERE table_schema = DATABASE()
         AND table_name LIKE ?

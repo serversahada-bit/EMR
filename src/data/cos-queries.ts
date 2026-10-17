@@ -32,7 +32,7 @@ export const TARGET_COS = 0.38;
 
 async function tabelCos(pola: RegExp): Promise<string[]> {
   const baris = await query<{ table_name: string }>(
-    `SELECT table_name
+    `SELECT table_name AS table_name
        FROM information_schema.tables
       WHERE table_schema = DATABASE()
         AND table_name LIKE 'data\\_cos\\_%'

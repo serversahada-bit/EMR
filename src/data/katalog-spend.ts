@@ -77,8 +77,12 @@ function labelDariTabel(prefix: string, tabel: string): string {
 
 /** Tabel kanal ini yang benar-benar ada, berikut labelnya. */
 export async function sumberKanal(kanal: KanalSpend): Promise<SumberKanal[]> {
+  /* Alias `AS table_name` WAJIB: MariaDB mengembalikan kolom ini sebagai
+     `table_name`, tetapi MySQL 8 sebagai `TABLE_NAME` — tanpa alias,
+     row.table_name kosong dan semua tabel dianggap tidak ada (terjadi di
+     server Coolify). Sama di mp-queries.ts dan cos-queries.ts. */
   const rows = await query<{ table_name: string }>(
-    `SELECT table_name
+    `SELECT table_name AS table_name
      FROM information_schema.tables
      WHERE table_schema = DATABASE()
        AND table_name LIKE ?
@@ -100,7 +104,7 @@ export async function sumberKanal(kanal: KanalSpend): Promise<SumberKanal[]> {
 /** Nama kolom beberapa tabel sekaligus. */
 async function kolomTabel(prefix: string): Promise<Map<string, Set<string>>> {
   const rows = await query<{ table_name: string; column_name: string }>(
-    `SELECT table_name, column_name
+    `SELECT table_name AS table_name, column_name AS column_name
      FROM information_schema.columns
      WHERE table_schema = DATABASE()
        AND table_name LIKE ?`,
