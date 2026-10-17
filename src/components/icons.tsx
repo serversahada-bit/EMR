@@ -99,6 +99,34 @@ export function IconMeta(props: IconProps) {
   );
 }
 
+/**
+ * Google: huruf "G" sebagai cincin yang terputus di kanan atas lalu
+ * masuk ke tengah. Digambar sebagai garis, bukan empat bidang warna
+ * resmi Google, supaya seragam dengan ikon lain dan ikut mewarisi
+ * currentColor saat menunya aktif.
+ */
+export function IconGoogle(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M20.3 12.1a8.2 8.2 0 1 1-2.4-5.8" />
+      <path d="M20.3 12.1h-7.6" />
+    </Icon>
+  );
+}
+
+/**
+ * Snack Video: bingkai video dengan tombol putar. Digambar sebagai garis
+ * seperti ikon lain supaya ikut mewarisi currentColor saat menunya aktif.
+ */
+export function IconSnack(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2.5" y="5" width="19" height="14" rx="3" />
+      <path d="M10.5 9.5l4.5 2.5-4.5 2.5z" />
+    </Icon>
+  );
+}
+
 export function IconSync(props: IconProps) {
   return (
     <Icon {...props}>
@@ -210,6 +238,68 @@ export function IconUsers(props: IconProps) {
       <circle cx="9" cy="8" r="3.5" />
       <path d="M2.5 20c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5" />
       <path d="M16.5 5.2a3.5 3.5 0 0 1 0 6.6M18 14.8c2.1.7 3.5 2.3 3.5 4.4" />
+    </Icon>
+  );
+}
+
+export function IconStore(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 9.5V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9.5" />
+      <path d="M3 9.5 5 4h14l2 5.5" />
+      <path d="M3 9.5h18" />
+      <path d="M9.5 20v-5.5h5V20" />
+    </Icon>
+  );
+}
+
+export function IconChat(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M20 14.5a2.5 2.5 0 0 1-2.5 2.5H8l-4 3V6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5Z" />
+      <path d="M8.5 10.5h7" />
+      <path d="M8.5 13.5h4" />
+    </Icon>
+  );
+}
+
+export function IconTruck(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 7.5h10v9H3z" />
+      <path d="M13 10.5h4l3 3.5v2.5h-7z" />
+      <circle cx="7" cy="18" r="1.8" />
+      <circle cx="17" cy="18" r="1.8" />
+    </Icon>
+  );
+}
+
+export function IconShield(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5 19 6v5.5c0 4-3 7.2-7 8.5-4-1.3-7-4.5-7-8.5V6z" />
+      <path d="M9.2 12l2 2 3.6-3.8" />
+    </Icon>
+  );
+}
+
+export function IconKey(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="M11 12l8.5-8.5" />
+      <path d="M16.5 6.5l2.5 2.5" />
+      <path d="M14 9l2 2" />
+    </Icon>
+  );
+}
+
+export function IconLogout(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14 4h3.5A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5H14" />
+      <path d="M10 8l-4 4 4 4" />
+      <path d="M6 12h9" />
     </Icon>
   );
 }

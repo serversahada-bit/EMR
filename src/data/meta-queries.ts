@@ -11,6 +11,9 @@ export const META_SOURCES = [
   { id: "plus", label: "Plus", table: "data_spend_meta_plus_harian" },
   { id: "sereal", label: "Sereal", table: "data_spend_meta_sereal_harian" },
   { id: "utama-2024", label: "Utama 2024", table: "data_spend_meta_2024_harian" },
+  { id: "gnait", label: "G'Nait", table: "data_spend_meta_gnait_harian" },
+  { id: "phenobody", label: "Phenobody", table: "data_spend_meta_phenobody_harian" },
+  { id: "etacefit", label: "Etacefit", table: "data_spend_meta_etacefit_harian" },
 ] as const;
 
 export type MetaSourceId = (typeof META_SOURCES)[number]["id"];

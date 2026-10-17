@@ -68,15 +68,42 @@ export async function ringkasCustomer(): Promise<RingkasCustomer> {
   };
 }
 
-/** Tahun registrasi yang tersedia, terbaru lebih dulu. */
+/**
+ * Tahun yang tersedia di dropdown, terbaru lebih dulu.
+ *
+ * Gabungan dua sumber: tahun registrasi (`data_customer.tgl_reg`, mulai
+ * 2024 karena migrasi massal) dan tahun transaksi (`data_transaksi`,
+ * mundur sampai 2023). Untuk tahun yang hanya ada di transaksi, daftar
+ * customernya diturunkan dari transaksi — lihat `daftarCustomer`.
+ */
 export async function daftarTahun(): Promise<number[]> {
-  const rows = await query<{ tahun: unknown }>(
-    `SELECT DISTINCT YEAR(tgl_reg) AS tahun
-     FROM data_customer
-     WHERE tgl_reg > '1970-01-01'
-     ORDER BY tahun DESC`,
-  );
-  return rows.map((r) => Number(r.tahun)).filter((t) => t > 1970);
+  const [reg, trx] = await Promise.all([
+    query<{ tahun: unknown }>(
+      `SELECT DISTINCT YEAR(tgl_reg) AS tahun
+       FROM data_customer
+       WHERE tgl_reg > '1970-01-01'`,
+    ),
+    /* MIN/MAX langsung atas kolom (bukan dibungkus YEAR) agar indeks
+       tanggal_proses terpakai; rentang tahunnya diisi di sisi JS. */
+    query<{ lo: unknown; hi: unknown }>(
+      `SELECT MIN(tanggal_proses) AS lo, MAX(tanggal_proses) AS hi
+       FROM data_transaksi
+       WHERE tanggal_proses > '1970-01-01'`,
+    ),
+  ]);
+
+  const tahun = new Set<number>();
+  for (const r of reg) {
+    const t = Number(r.tahun);
+    if (t > 1970) tahun.add(t);
+  }
+  const lo = trx[0]?.lo ? Number(String(trx[0].lo).slice(0, 4)) : 0;
+  const hi = trx[0]?.hi ? Number(String(trx[0].hi).slice(0, 4)) : 0;
+  if (lo > 1970 && hi >= lo) {
+    for (let t = lo; t <= hi; t++) tahun.add(t);
+  }
+
+  return [...tahun].sort((a, b) => b - a);
 }
 
 /** Daftar provinsi untuk dropdown filter. */
@@ -100,6 +127,21 @@ export async function daftarCustomer(opsi: {
   const provinsi = (opsi.provinsi ?? "").trim();
   const tahun = opsi.tahun;
   const halaman = Math.max(1, Math.floor(opsi.halaman ?? 1));
+
+  /* Tahun yang tidak punya registrasi di data_customer (mis. 2023)
+     dilayani dari data_transaksi. Dicek apa adanya, bukan di-hardcode,
+     agar tetap benar bila data_customer kelak mundur ke tahun itu. */
+  if (tahun && Number.isInteger(tahun)) {
+    const adaReg = await query<{ ada: unknown }>(
+      `SELECT EXISTS(
+         SELECT 1 FROM data_customer WHERE tgl_reg >= ? AND tgl_reg < ?
+       ) AS ada`,
+      [`${tahun}-01-01`, `${tahun + 1}-01-01`],
+    );
+    if (!num(adaReg[0]?.ada)) {
+      return daftarCustomerTransaksi({ cari, provinsi, tahun, halaman });
+    }
+  }
 
   const syarat: string[] = [];
   const params: Array<string | number> = [];
@@ -157,6 +199,87 @@ export async function daftarCustomer(opsi: {
           ? null
           : teks(row.tgl_reg).slice(0, 10),
       roCount: num(row.ro_count),
+      adv: teks(row.adv),
+    })),
+  };
+}
+
+/**
+ * Daftar customer untuk tahun yang hanya ada di data_transaksi (mis.
+ * 2023). Satu baris = satu pembeli, dikelompokkan per nomor HP
+ * (`contack`, terisi penuh). Nama & HP andal; kabupaten/provinsi
+ * diambil dari transaksi dan hanya terisi sebagian (~24%). "Beli ulang"
+ * di sini berarti jumlah order pada tahun tersebut, dan "Terdaftar"
+ * dikosongkan karena tak ada tanggal registrasi.
+ */
+async function daftarCustomerTransaksi(opsi: {
+  cari: string;
+  provinsi: string;
+  tahun: number;
+  halaman: number;
+}): Promise<HalamanCustomer> {
+  const { cari, provinsi, tahun, halaman } = opsi;
+
+  const syarat: string[] = [
+    "tanggal_proses >= ? AND tanggal_proses < ?",
+    "COALESCE(contack, '') <> ''",
+  ];
+  const params: Array<string | number> = [
+    `${tahun}-01-01`,
+    `${tahun + 1}-01-01`,
+  ];
+
+  if (cari !== "") {
+    syarat.push("(first_name LIKE ? OR contack LIKE ?)");
+    params.push(`%${cari}%`, `%${cari}%`);
+  }
+  if (provinsi !== "") {
+    /* Ejaan provinsi di transaksi bisa beda huruf besar/kecil dari
+       dropdown (yang berasal dari data_customer), jadi dibandingkan
+       tanpa peduli kapitalisasi. */
+    syarat.push("UPPER(TRIM(provinsi)) = UPPER(?)");
+    params.push(provinsi);
+  }
+
+  const where = `WHERE ${syarat.join(" AND ")}`;
+
+  const hitung = await query<{ total: unknown }>(
+    `SELECT COUNT(DISTINCT contack) AS total FROM data_transaksi ${where}`,
+    params,
+  );
+  const total = num(hitung[0]?.total);
+  const jumlahHalaman = Math.max(1, Math.ceil(total / PER_HALAMAN));
+  const halamanAman = Math.min(halaman, jumlahHalaman);
+
+  const rows = await query<Record<string, unknown>>(
+    `SELECT contack,
+            MAX(first_name)                 AS nama,
+            MAX(NULLIF(TRIM(kota), ''))     AS kota,
+            MAX(NULLIF(TRIM(provinsi), '')) AS provinsi,
+            COUNT(*)                        AS jumlah_order,
+            MAX(NULLIF(TRIM(adv), ''))      AS adv
+     FROM data_transaksi
+     ${where}
+     GROUP BY contack
+     ORDER BY MAX(tanggal_proses) DESC
+     LIMIT ? OFFSET ?`,
+    [...params, PER_HALAMAN, (halamanAman - 1) * PER_HALAMAN],
+  );
+
+  return {
+    total,
+    halaman: halamanAman,
+    jumlahHalaman,
+    baris: rows.map((row, i) => ({
+      /* Tidak ada id_customer di transaksi; id ini hanya kunci baris
+         untuk tabel, unik dalam satu halaman. */
+      id: (halamanAman - 1) * PER_HALAMAN + i + 1,
+      nama: teks(row.nama),
+      hp: teks(row.contack),
+      kabupaten: teks(row.kota),
+      provinsi: teks(row.provinsi),
+      tglReg: null,
+      roCount: num(row.jumlah_order),
       adv: teks(row.adv),
     })),
   };

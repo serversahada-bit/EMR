@@ -144,7 +144,7 @@ export function CustomerView({ data }: { data: CustomerData }) {
 
           <label className="block">
             <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">
-              Tahun daftar
+              Tahun
             </span>
             <select
               value={tahun}

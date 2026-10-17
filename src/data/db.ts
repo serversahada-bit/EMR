@@ -23,7 +23,7 @@ const pool = mysql.createPool({
 
 export async function query<T>(
   sql: string,
-  params: Array<string | number> = [],
+  params: Array<string | number | null> = [],
 ): Promise<T[]> {
   const [rows] = await pool.query(sql, params);
   return rows as T[];

@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# kunci tanda tangan sesi login (dibuat otomatis bila AUTH_SECRET kosong)
+.emr-secret

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { logout } from "@/app/login/actions";
 import { meta } from "@/data/report";
-import { IconExpand, IconSearch } from "./icons";
+import { IconExpand, IconLogout, IconSearch } from "./icons";
 
 function initials(name: string): string {
   return name
@@ -16,9 +17,11 @@ function initials(name: string): string {
 export function TopBar({
   query,
   onQueryChange,
+  pengguna,
 }: {
   query: string;
   onQueryChange: (value: string) => void;
+  pengguna: { username: string; nama: string | null };
 }) {
   const [isFullscreen, setFullscreen] = useState(false);
 
@@ -75,12 +78,24 @@ export function TopBar({
           </button>
 
           <span
-            title={"Disusun oleh " + meta.preparedBy}
+            title={`Masuk sebagai ${pengguna.nama ?? pengguna.username} (${pengguna.username})`}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-hairline text-[11px] font-semibold text-ink-2"
             style={{ background: "var(--tint-s1)" }}
           >
-            {initials(meta.preparedBy) || "EM"}
+            {initials(pengguna.nama ?? pengguna.username) ||
+              pengguna.username.slice(0, 2).toUpperCase()}
           </span>
+
+          <form action={logout}>
+            <button
+              type="submit"
+              title="Keluar"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-page hover:text-ink"
+            >
+              <IconLogout size={18} />
+              <span className="sr-only">Keluar</span>
+            </button>
+          </form>
         </div>
       </div>
     </header>

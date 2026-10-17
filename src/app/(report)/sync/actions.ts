@@ -2,6 +2,7 @@
 
 import { SyncInput } from "@/data/sheet-sync/row-schema";
 import { syncSheet, type RingkasanSync } from "@/data/sheet-sync/sync";
+import { wajibLogin } from "@/lib/sesi";
 
 export type HasilAksi =
   | { status: "awal" }
@@ -18,6 +19,9 @@ export async function jalankanSync(
   _sebelumnya: HasilAksi,
   formData: FormData,
 ): Promise<HasilAksi> {
+  /* Bisa dipanggil lewat POST langsung — sesi diperiksa di sini juga. */
+  await wajibLogin();
+
   const masukan = SyncInput.safeParse({
     sheetUrl: String(formData.get("sheetUrl") ?? "").trim(),
     tabName: String(formData.get("tabName") ?? "").trim(),

@@ -7,14 +7,24 @@ import {
   IconBuilding,
   IconCoins,
   IconFlag,
+  IconGear,
   IconGrid,
+  IconGoogle,
+  IconSnack,
   IconMeta,
   IconDocument,
   IconSync,
   IconUsers,
   IconPanelToggle,
+  IconPercent,
   IconPrint,
+  IconStore,
+  IconChat,
+  IconTruck,
+  IconShield,
+  IconMegaphone,
   IconWallet,
+  IconKey,
 } from "./icons";
 
 /**
@@ -24,6 +34,11 @@ import {
  * halamannya — rutenya tetap hidup dan bisa dibuka langsung lewat
  * URL. Ketiga halaman yang disembunyikan masih memakai data contoh;
  * ubah ke `true` begitu sumber data riilnya tersambung.
+ *
+ * Sebagian menu (CRM, ADV, Pengiriman, Mutu data) rutenya sudah ada tapi isinya belum
+ * dibuat: halamannya memakai <BelumTerisi> yang menyebutkan tabel atau
+ * sheet mana yang akan memasoknya. Sengaja ditampilkan supaya urutan
+ * pengerjaan kelihatan, bukan disembunyikan seperti halaman data contoh.
  */
 const NAV = [
   { href: "/", label: "Dashboard", Icon: IconGrid, tampil: true },
@@ -41,8 +56,81 @@ const NAV = [
       },
     ],
   },
+  {
+    href: "/google",
+    label: "Google Ads",
+    Icon: IconGoogle,
+    tampil: true,
+    anak: [
+      {
+        href: "/google/spend-iklan",
+        label: "Tabel spend iklan",
+        Icon: IconDocument,
+      },
+    ],
+  },
+  {
+    href: "/snack",
+    label: "Snack Video",
+    Icon: IconSnack,
+    tampil: true,
+    anak: [
+      {
+        href: "/snack/spend-iklan",
+        label: "Tabel spend iklan",
+        Icon: IconDocument,
+      },
+    ],
+  },
+  {
+    href: "/marketplace",
+    label: "Marketplace",
+    Icon: IconStore,
+    tampil: true,
+    anak: [
+      {
+        href: "/marketplace/spend-iklan",
+        label: "Tabel spend iklan",
+        Icon: IconDocument,
+      },
+    ],
+  },
+  { href: "/crm", label: "CRM & blast", Icon: IconChat, tampil: true },
+  {
+    href: "/roas",
+    label: "ROAS & efisiensi",
+    Icon: IconPercent,
+    tampil: true,
+    anak: [
+      {
+        href: "/roas/cos-harian",
+        label: "Tabel COS harian",
+        Icon: IconDocument,
+      },
+    ],
+  },
+  { href: "/adv", label: "Performa ADV", Icon: IconMegaphone, tampil: true },
+  {
+    href: "/pengiriman",
+    label: "Pengiriman & retur",
+    Icon: IconTruck,
+    tampil: true,
+  },
   { href: "/customer", label: "Data customer", Icon: IconUsers, tampil: true },
+  { href: "/mutu-data", label: "Mutu data", Icon: IconShield, tampil: true },
   { href: "/sync", label: "Sync Sheet", Icon: IconSync, tampil: true },
+  {
+    href: "/setingan/produk",
+    label: "Setingan produk",
+    Icon: IconGear,
+    tampil: true,
+  },
+  {
+    href: "/setingan/user",
+    label: "Setingan user",
+    Icon: IconKey,
+    tampil: true,
+  },
   { href: "/divisi", label: "Unit bisnis", Icon: IconBuilding, tampil: false },
   {
     href: "/inisiatif",
@@ -136,7 +224,13 @@ export function Sidebar({
 
       <ul
         className={
-          "mt-5 flex flex-1 flex-col gap-1 " + (expanded ? "" : "items-center")
+          /* min-h-0 wajib: anak flex-column default-nya min-height:auto, jadi
+             tanpa ini ul menolak menyusut di bawah tinggi isinya dan
+             overflow-y-auto tidak pernah aktif — menunya terpotong, tidak
+             bisa di-scroll. overscroll-contain menahan scroll merembet ke
+             halaman saat daftar sudah mentok. */
+          "mt-5 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain " +
+          (expanded ? "" : "items-center")
         }
       >
         {MENU.map((item) => {
