@@ -171,7 +171,7 @@ const num = (value: unknown): number => Number(value ?? 0);
 
 /** Daftar bulan yang punya data, terbaru lebih dulu. */
 export async function listBulan(): Promise<string[]> {
-  return denganMemo("listBulan", 5 * 60_000, async () => {
+  return denganMemo("listBulan", 30 * 60_000, async () => {
     const rows = await query<{ bulan: string }>(
       `SELECT DISTINCT DATE_FORMAT(tanggal_proses, '%Y-%m') AS bulan
        FROM data_transaksi
@@ -261,7 +261,7 @@ export async function omsetPerBulan(
     rentang === "semua" ? "1971-01-01" : awalRentangBulan(bulan, rentang);
   const [, akhir] = batasBulan(bulan);
 
-  return denganMemo(`tren:${bulan}:${rentang}`, 60_000, async () => {
+  return denganMemo(`tren:${bulan}:${rentang}`, 5 * 60_000, async () => {
     const rows = await query<Record<string, unknown>>(
       `SELECT DATE_FORMAT(tanggal_proses, '%Y-%m') AS bulan,
               COUNT(*)       AS transaksi,
