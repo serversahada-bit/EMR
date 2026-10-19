@@ -15,6 +15,7 @@ import {
   normalizeHeader,
 } from "./header-map";
 import {
+  bersihkanLatin1,
   normalizeHp,
   normalizeNama,
   normalizeTanggal,
@@ -26,6 +27,8 @@ import {
 export interface BarisTerurai {
   /** Nomor baris sebagaimana terlihat di sheet (1-based). */
   nomorBaris: number;
+  /** Ada nilai yang diubah agar muat di kolom latin1 (mis. nama hias). */
+  dibersihkan: boolean;
   /** Kolom tabel → nilai siap tulis. */
   kolom: Record<string, string | null>;
   kodeBooking: string;
@@ -134,13 +137,23 @@ export function uraiSheet(rows: unknown[][]): HasilUrai {
       continue;
     }
 
-    const kontak = teks(ambil(mentah, "contack"));
+    /* Semua nilai yang benar-benar disimpan lewat sini, supaya nilai yang
+       dibandingkan untuk dedup sama persis dengan yang ditulis. */
+    let dibersihkan = false;
+    const bersih = (nilai: unknown): string => {
+      const asli = teks(nilai);
+      const hasil = bersihkanLatin1(asli);
+      if (hasil !== asli) dibersihkan = true;
+      return hasil;
+    };
+
+    const kontak = bersih(ambil(mentah, "contack"));
     if (kontak === "") {
       dilewati++;
       continue;
     }
 
-    const kodeBooking = teks(ambil(mentah, "kode_booking"));
+    const kodeBooking = bersih(ambil(mentah, "kode_booking"));
     if (kodeBooking === "") {
       dilewati++;
       continue;
@@ -173,7 +186,7 @@ export function uraiSheet(rows: unknown[][]): HasilUrai {
 
       kolom[namaKolom] = KOLOM_UANG.has(namaKolom)
         ? normalizeUang(nilai)
-        : teks(nilai);
+        : bersih(nilai);
     }
 
     if (gagalTanggal) {
@@ -181,12 +194,13 @@ export function uraiSheet(rows: unknown[][]): HasilUrai {
       continue;
     }
 
-    const alamat = teks(ambil(mentah, "alamat"));
+    const alamat = bersih(ambil(mentah, "alamat"));
     const cs = normalizeNama(ambil(mentah, "cs"));
     const adv = normalizeNama(ambil(mentah, "adv"));
 
     baris.push({
       nomorBaris,
+      dibersihkan,
       kolom,
       kodeBooking,
       kontak,

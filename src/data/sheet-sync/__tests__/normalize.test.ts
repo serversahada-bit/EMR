@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test, { describe } from "node:test";
 
 import {
+  bersihkanLatin1,
   normalizeHp,
   normalizeNama,
   normalizeTanggal,
@@ -126,5 +127,41 @@ describe("pembantu lain", () => {
     assert.equal(tersensor("0812***456"), true);
     assert.equal(tersensor("08123456"), false);
     assert.equal(tersensor(""), false);
+  });
+});
+
+describe("bersihkanLatin1", () => {
+  test("nilai yang sudah muat dikembalikan apa adanya", () => {
+    assert.equal(bersihkanLatin1("Sriyadi"), "Sriyadi");
+    /* Kutip melengkung ada di cp1252 — yang dipakai MySQL sebagai
+       "latin1" — jadi tidak perlu diubah. */
+    assert.equal(bersihkanLatin1("bunyi krek”"), "bunyi krek”");
+    assert.equal(bersihkanLatin1("Café Purée"), "Café Purée");
+  });
+
+  test("baris baru dan tab dipertahankan", () => {
+    assert.equal(bersihkanLatin1("COD: J&T\nTIKTOK"), "COD: J&T\nTIKTOK");
+  });
+
+  test("huruf hias Unicode jadi huruf biasa", () => {
+    /* Kasus nyata yang menggagalkan sync: nama WhatsApp bergaya
+       Mathematical Sans-Serif Bold Italic. */
+    assert.equal(
+      bersihkanLatin1("\u{1D64E}***\u{1D64A}\u{1D650} \u{1D58B}* \u{1D63D}**"),
+      "S***OU f* B**",
+    );
+  });
+
+  test("huruf beraksen di luar cp1252 kehilangan aksennya saja", () => {
+    assert.equal(bersihkanLatin1("Āri"), "Ari");
+  });
+
+  test("emoji dan aksara non-Latin dibuang, sisanya tetap", () => {
+    assert.equal(bersihkanLatin1("Ana \u{1F60A} B"), "Ana B");
+    assert.equal(bersihkanLatin1("سا Budi"), "Budi");
+  });
+
+  test("nilai yang seluruhnya tak terpakai jadi string kosong", () => {
+    assert.equal(bersihkanLatin1("\u{1F60A}"), "");
   });
 });

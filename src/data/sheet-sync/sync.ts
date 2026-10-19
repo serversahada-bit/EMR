@@ -256,7 +256,7 @@ export async function simpanSheet(
       errors.push({ row: baris.nomorBaris, reason: fatal.join("; ") });
       continue;
     }
-    if (perbaikan.length > 0) diperbaiki++;
+    if (perbaikan.length > 0 || baris.dibersihkan) diperbaiki++;
     sah.push(baris);
   }
 

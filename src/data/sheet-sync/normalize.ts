@@ -13,7 +13,81 @@ const MS_PER_HARI = 86_400_000;
 
 function teks(nilai: unknown): string {
   if (nilai === null || nilai === undefined) return "";
-  return String(nilai).trim();
+  return bersihkanLatin1(String(nilai).trim());
+}
+
+/**
+ * Karakter di luar yang bisa disimpan kolom latin1.
+ *
+ * MySQL menyebutnya "latin1", tapi yang dipakainya sebenarnya cp1252 —
+ * rentang 0x80–0x9F terisi tanda kutip melengkung, tanda hubung panjang,
+ * dan elipsis. Karakter itu AMAN; yang ditolak hanya di luar daftar ini.
+ */
+const CP1252_EKSTRA = new Set([
+  0x20ac, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030,
+  0x0160, 0x2039, 0x0152, 0x017d, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022,
+  0x2013, 0x2014, 0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x017e, 0x0178,
+]);
+
+function muatLatin1(titik: number): boolean {
+  /* Tab dan baris baru ikut dipertahankan: sel alamat dan keterangan
+     memang berisi beberapa baris. */
+  if (titik === 0x09 || titik === 0x0a || titik === 0x0d) return true;
+  if (titik >= 0x20 && titik <= 0x7e) return true;
+  if (titik >= 0xa0 && titik <= 0xff) return true;
+  return CP1252_EKSTRA.has(titik);
+}
+
+/**
+ * Buat sebuah nilai muat di kolom latin1, tanpa membuang isinya.
+ *
+ * Tabel lama (`data_transaksi`, `data_customer`) seluruhnya latin1,
+ * sedangkan nama customer dari WhatsApp kerap memakai huruf hias
+ * Unicode 4-byte seperti `𝙎`. Koneksi kita jujur memakai utf8mb4, jadi
+ * MySQL benar-benar mengonversi dan menolak baris itu — satu nama
+ * menggagalkan seluruh sync, bukan cuma barisnya.
+ *
+ * Aplikasi PHP lama lolos karena menulis lewat koneksi latin1, yang
+ * menyelundupkan byte UTF-8 mentah ke kolom latin1. Hasilnya terbaca
+ * sebagai mojibake di dashboard; itu bukan contoh yang diikuti.
+ *
+ * NFKC mengembalikan huruf hias ke huruf biasa (`𝙎` → `S`), jadi nama
+ * tetap terbaca. Yang benar-benar tidak punya padanan — emoji, aksara
+ * non-Latin — dibuang, karena kolomnya memang tidak bisa memuatnya.
+ */
+export function bersihkanLatin1(nilai: string): string {
+  let perlu = false;
+  for (const huruf of nilai) {
+    if (!muatLatin1(huruf.codePointAt(0)!)) {
+      perlu = true;
+      break;
+    }
+  }
+  /* Jalur cepat: hampir semua sel sudah muat, dan nilainya tidak boleh
+     ikut berubah hanya karena fungsi ini dilewati. */
+  if (!perlu) return nilai;
+
+  let hasil = "";
+  for (const huruf of nilai.normalize("NFKC")) {
+    if (muatLatin1(huruf.codePointAt(0)!)) {
+      hasil += huruf;
+      continue;
+    }
+
+    /* Huruf beraksen di luar cp1252 (mis. "Ā") cukup kehilangan
+       aksennya, bukan hurufnya. */
+    const tanpaAksen = huruf.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    if (
+      tanpaAksen !== "" &&
+      [...tanpaAksen].every((h) => muatLatin1(h.codePointAt(0)!))
+    ) {
+      hasil += tanpaAksen;
+    }
+  }
+
+  /* Spasi ganda bekas karakter yang dibuang dirapatkan; baris baru
+     dibiarkan utuh. */
+  return hasil.replace(/ {2,}/g, " ").trim();
 }
 
 function duaDigit(n: number): string {
