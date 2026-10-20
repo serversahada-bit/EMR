@@ -12,13 +12,12 @@ import {
 } from "./katalog-spend";
 
 /**
- * Google Ads — sumbernya ditemukan dari katalog database.
- *
- * Seluruh logikanya ada di `katalog-spend`, dipakai bersama dengan Snack
- * Video; di sini hanya awalan tabel dan tahun yang ditampilkan.
+ * Google Ads — satu tabel gabungan `data_spend_google`; sumber = nilai
+ * kolom `sumber_tabel`. Seluruh logikanya ada di `katalog-spend`, dipakai
+ * bersama dengan Snack Video.
  */
 const GOOGLE: KanalSpend = {
-  prefix: "data_spend_google",
+  tabel: "data_spend_google",
   /**
    * Semua tahun ditampilkan.
    *

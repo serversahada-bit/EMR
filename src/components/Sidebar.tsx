@@ -32,13 +32,12 @@ import {
  *
  * `tampil: false` menyembunyikan item dari sidebar TANPA menghapus
  * halamannya — rutenya tetap hidup dan bisa dibuka langsung lewat
- * URL. Ketiga halaman yang disembunyikan masih memakai data contoh;
- * ubah ke `true` begitu sumber data riilnya tersambung.
+ * URL. Ubah ke `true` begitu sumber data riilnya tersambung.
  *
- * Sebagian menu (CRM, ADV, Pengiriman, Mutu data) rutenya sudah ada tapi isinya belum
- * dibuat: halamannya memakai <BelumTerisi> yang menyebutkan tabel atau
- * sheet mana yang akan memasoknya. Sengaja ditampilkan supaya urutan
- * pengerjaan kelihatan, bukan disembunyikan seperti halaman data contoh.
+ * Yang disembunyikan: Unit bisnis, Inisiatif, Biaya (masih data contoh)
+ * dan Performa ADV, Pengiriman & retur, Mutu data (isinya belum dibuat —
+ * halamannya memakai <BelumTerisi> yang menyebutkan tabel atau sheet
+ * pemasoknya). Disembunyikan atas permintaan pengguna 20 Okt 2026.
  */
 const NAV = [
   { href: "/", label: "Dashboard", Icon: IconGrid, tampil: true },
@@ -95,7 +94,17 @@ const NAV = [
       },
     ],
   },
-  { href: "/crm", label: "CRM & blast", Icon: IconChat, tampil: true },
+  {
+    href: "/crm",
+    label: "CRM & blast",
+    Icon: IconChat,
+    tampil: true,
+    anak: [
+      { href: "/crm/blast", label: "Blast CRM", Icon: IconDocument },
+      { href: "/crm/cs", label: "Performa CS", Icon: IconDocument },
+      { href: "/crm/ro", label: "Repeat order", Icon: IconDocument },
+    ],
+  },
   {
     href: "/roas",
     label: "ROAS & efisiensi",
@@ -109,15 +118,15 @@ const NAV = [
       },
     ],
   },
-  { href: "/adv", label: "Performa ADV", Icon: IconMegaphone, tampil: true },
+  { href: "/adv", label: "Performa ADV", Icon: IconMegaphone, tampil: false },
   {
     href: "/pengiriman",
     label: "Pengiriman & retur",
     Icon: IconTruck,
-    tampil: true,
+    tampil: false,
   },
   { href: "/customer", label: "Data customer", Icon: IconUsers, tampil: true },
-  { href: "/mutu-data", label: "Mutu data", Icon: IconShield, tampil: true },
+  { href: "/mutu-data", label: "Mutu data", Icon: IconShield, tampil: false },
   { href: "/sync", label: "Sync Sheet", Icon: IconSync, tampil: true },
   {
     href: "/setingan/produk",

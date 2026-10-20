@@ -2,7 +2,15 @@ import "server-only";
 
 import { query } from "./db";
 
-/** Setiap tabel adalah sumber tersendiri; nama tabel tetap dan tidak berasal dari URL. */
+/**
+ * Semua spend Meta ada di SATU tabel gabungan `data_spend_meta` (sejak
+ * konsolidasi 20 Okt 2026). Sebuah sumber kini = nilai kolom
+ * `sumber_tabel` (nama tabel lama asal baris itu), bukan tabel fisik —
+ * id dan label di bawah tidak berubah, jadi pemetaan produk dan URL lama
+ * tetap berlaku. `table` = nilai `sumber_tabel`.
+ */
+export const TABEL_META = "data_spend_meta";
+
 export const META_SOURCES = [
   { id: "utama-2026", label: "Utama 2026", table: "data_spend_meta_harian" },
   { id: "premium-2026", label: "Premium 2026", table: "data_spend_meta_premium_harian" },
@@ -18,13 +26,7 @@ export const META_SOURCES = [
 
 export type MetaSourceId = (typeof META_SOURCES)[number]["id"];
 
-/**
- * Nama tabel untuk sebuah id sumber.
- *
- * Dicari lewat daftar tetap di atas, bukan disusun dari masukan: nama
- * tabel tidak bisa diparameterkan di SQL, jadi satu-satunya cara aman
- * adalah memastikan nilainya berasal dari konstanta kita sendiri.
- */
+/** Nilai `sumber_tabel` untuk sebuah id sumber; dipakai sebagai parameter `?`. */
 function tabelSumber(sourceId: string): string | null {
   return META_SOURCES.find((s) => s.id === sourceId)?.table ?? null;
 }
@@ -46,9 +48,11 @@ export async function metaBulanSumber(sourceId: string): Promise<string[]> {
 
   const rows = await query<{ bulan: string }>(
     `SELECT DISTINCT DATE_FORMAT(tanggal, '%Y-%m') AS bulan
-     FROM \`${tabel}\`
-     WHERE tanggal IS NOT NULL AND tanggal > '1970-01-01'
+     FROM ${TABEL_META}
+     WHERE sumber_tabel = ?
+       AND tanggal IS NOT NULL AND tanggal > '1970-01-01'
      ORDER BY bulan DESC`,
+    [tabel],
   );
   return rows.map((r) => r.bulan);
 }
@@ -73,11 +77,11 @@ export async function metaSpendHarian(
             COALESCE(SUM(klik_tautan), 0)     AS klik,
             COALESCE(SUM(total_lead_real), 0) AS lead_real,
             COUNT(*)                          AS baris
-     FROM \`${tabel}\`
-     WHERE tanggal >= ? AND tanggal < ?
+     FROM ${TABEL_META}
+     WHERE sumber_tabel = ? AND tanggal >= ? AND tanggal < ?
      GROUP BY tanggal
      ORDER BY tanggal`,
-    batasBulanIklan(bulan),
+    [tabel, ...batasBulanIklan(bulan)],
   );
 
   return rows.map((row) => ({
@@ -108,26 +112,23 @@ export interface MetaSourceMonth {
   lastDate: string;
 }
 
-/** Jumlah spend_iklan tanpa PPN per bulan dari ketujuh tabel harian. */
+/** Jumlah spend_iklan tanpa PPN per bulan per sumber — satu query. */
 export async function metaSourceMonths(): Promise<MetaSourceMonth[]> {
-  const selects = META_SOURCES.map(
-    (source) =>
-      `SELECT '${source.id}' AS sourceId,
-              DATE_FORMAT(tanggal, '%Y-%m') AS month,
-              COUNT(*) AS records,
-              COALESCE(SUM(spend_iklan), 0) AS spend,
-              MAX(tanggal) AS lastDate
-       FROM \`${source.table}\`
-       WHERE tanggal IS NOT NULL AND tanggal > '1970-01-01'
-       GROUP BY DATE_FORMAT(tanggal, '%Y-%m')`,
-  );
-
+  const idDari = new Map<string, string>(META_SOURCES.map((s) => [s.table, s.id]));
   const rows = await query<Record<string, unknown>>(
-    selects.join(" UNION ALL ") + " ORDER BY month, sourceId",
+    `SELECT sumber_tabel AS sumber,
+            DATE_FORMAT(tanggal, '%Y-%m') AS month,
+            COUNT(*) AS records,
+            COALESCE(SUM(spend_iklan), 0) AS spend,
+            MAX(tanggal) AS lastDate
+     FROM ${TABEL_META}
+     WHERE tanggal IS NOT NULL AND tanggal > '1970-01-01'
+     GROUP BY sumber_tabel, DATE_FORMAT(tanggal, '%Y-%m')
+     ORDER BY month, sumber_tabel`,
   );
 
-  return rows.map((row) => ({
-    sourceId: String(row.sourceId),
+  return rows.filter((row) => idDari.has(String(row.sumber))).map((row) => ({
+    sourceId: idDari.get(String(row.sumber))!,
     month: String(row.month),
     spend: Number(row.spend ?? 0),
     records: Number(row.records ?? 0),

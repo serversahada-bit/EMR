@@ -12,7 +12,7 @@ export default function AdvPage() {
         "Riwayat perpindahan produk antar bulan",
       ]}
       sumber={[
-        "data_spend_meta_all + data_spend_google_*_harian (lewat id_adv)",
+        "data_spend_meta + data_spend_google (lewat id_adv)",
         "data_transaksi (kolom adv)",
         "data_adv",
       ]}

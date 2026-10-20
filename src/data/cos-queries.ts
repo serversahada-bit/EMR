@@ -10,11 +10,11 @@ import { query } from "./db";
  * ROAS per kanal: closing dari iklan yang tercatat di CRM atau Shopee
  * tetap ikut dihitung.
  *
- * Dua tabel per tahun:
- *  - `data_cos_<tahun>_harian`: satu baris per produk per hari. Hanya
+ * Dua tabel (semua tahun, kolom `tahun`):
+ *  - `data_cos_harian`: satu baris per produk per hari. Hanya
  *    `jenis = 'DATA'` yang boleh dijumlah — `LEBIH HARI` adalah baris
  *    ke-31 di bulan 30 hari (tanggalnya NULL).
- *  - `data_cos_<tahun>_bulanan`: satu baris per produk per bulan, berisi
+ *  - `data_cos_bulanan`: satu baris per produk per bulan, berisi
  *    KOREKSI yang dikurangkan pemilik sheet lewat rumus baris TOTAL
  *    (Kompensasi Snack + Pajak, angka ketik langsung). Koreksi itu tidak
  *    ada di baris harian mana pun, jadi angka "versi sheet" hanya bisa
@@ -24,21 +24,16 @@ import { query } from "./db";
  * jangan dicocokkan dengan omset marketplace.
  */
 
-/* Nama tabel tidak boleh datang dari URL; hanya dari katalog database. */
-const POLA_HARIAN = /^data_cos_\d{4}_harian$/;
-const POLA_BULANAN = /^data_cos_\d{4}_bulanan$/;
-
 export const TARGET_COS = 0.38;
 
-async function tabelCos(pola: RegExp): Promise<string[]> {
-  const baris = await query<{ table_name: string }>(
-    `SELECT table_name AS table_name
-       FROM information_schema.tables
-      WHERE table_schema = DATABASE()
-        AND table_name LIKE 'data\\_cos\\_%'
-      ORDER BY table_name`,
-  );
-  return baris.map((r) => r.table_name).filter((t) => pola.test(t));
+/* Sejak konsolidasi 20 Okt 2026: satu tabel untuk semua tahun. Fungsi
+   ini dipertahankan supaya query di bawah tetap berbentuk subquery yang
+   sama; isinya kini konstanta, bukan hasil pencarian katalog. */
+const TABEL_HARIAN = "data_cos_harian";
+const TABEL_BULANAN = "data_cos_bulanan";
+
+async function tabelCos(tabel: string): Promise<string[]> {
+  return [tabel];
 }
 
 export interface CosBulan {
@@ -57,7 +52,7 @@ export interface CosBulan {
 
 /** Semua baris bulanan, seluruh tahun yang ada. */
 export async function cosBulanan(): Promise<CosBulan[]> {
-  const tabel = await tabelCos(POLA_BULANAN);
+  const tabel = await tabelCos(TABEL_BULANAN);
   if (tabel.length === 0) return [];
   const inner = tabel
     .map(
@@ -116,7 +111,7 @@ export async function cosHarian(
   bulan: string,
   produk: string | null,
 ): Promise<CosHari[]> {
-  const tabel = await tabelCos(POLA_HARIAN);
+  const tabel = await tabelCos(TABEL_HARIAN);
   if (tabel.length === 0) return [];
   const inner = tabel
     .map(

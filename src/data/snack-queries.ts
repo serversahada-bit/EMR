@@ -12,16 +12,13 @@ import {
 } from "./katalog-spend";
 
 /**
- * Snack Video — sumbernya ditemukan dari katalog database.
- *
- * Saat halaman ini dibuat belum ada satu pun tabel `data_spend_snack…`;
- * sumbernya dibaca dari `information_schema`, jadi halaman langsung
- * terisi begitu tabelnya dibuat tanpa mengubah kode. Di file Progres,
+ * Snack Video — satu tabel gabungan `data_spend_snack`; sumber = nilai
+ * kolom `sumber_tabel` (lihat katalog-spend). Di file Progres,
  * datanya ada di sheet berakhiran "(SNACK)" — mis. `ADV GUSTI (SNACK)`,
  * `ADV PUTRA (SNACK)` — dengan banner `SNACKVIDEO GAMAMILK`.
  */
 const SNACK: KanalSpend = {
-  prefix: "data_spend_snack",
+  tabel: "data_spend_snack",
   /** Semua tahun ditampilkan; Snack belum punya data yang perlu dibatasi. */
   tahunAktif: [],
 };

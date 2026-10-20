@@ -3,34 +3,29 @@ import "server-only";
 import { query } from "./db";
 
 /**
- * Kanal iklan yang sumbernya ditemukan dari katalog database, bukan dari
- * daftar tetap seperti Meta.
+ * Kanal iklan yang tersimpan di SATU tabel gabungan per kanal.
  *
- * Dipakai bersama oleh Google Ads dan Snack Video. Keduanya persis sama
- * perilakunya — temukan tabel berawalan tertentu, saring yang strukturnya
- * cocok, lalu jumlahkan per bulan atau per tanggal — jadi logikanya
- * ditaruh di satu tempat; pembedanya hanya awalan nama tabel dan tahun
- * yang ditampilkan.
+ * Dipakai bersama oleh Google Ads dan Snack Video. Sejak konsolidasi
+ * database (20 Okt 2026) tiap kanal punya satu tabel — `data_spend_google`,
+ * `data_spend_snack` — dengan `produk` dan `tahun` sebagai kolom, bukan
+ * puluhan tabel `data_spend_<kanal>_<produk>_<tahun>_harian`.
  *
- * Kenapa dari katalog, bukan daftar tetap: saat halaman sebuah kanal
- * dibuat, tabelnya kadang belum ada. Daftar tetap berarti menebak nama
- * tabel yang belum tentu dipakai nanti; dengan membaca
- * `information_schema`, halaman langsung hidup begitu tabelnya dibuat
- * tanpa mengubah kode.
+ * "Sumber" tetap dipertahankan sebagai satuan di halaman, tetapi kini
+ * berupa nilai kolom `sumber_tabel` (nama tabel lama tempat baris itu
+ * berasal), bukan tabel fisik. Dengan begitu id sumber tidak berubah —
+ * pemetaan di Setingan produk, kartu produk, dan URL tetap berlaku.
  *
- * Tetap aman dari injeksi: nama tabel datang dari server, bukan dari URL,
- * dan masih disaring ulang lewat pola di bawah sebelum pernah disisipkan
- * ke SQL.
+ * Nama tabel kini konstanta di kode dan sumber dipilih lewat parameter
+ * `?`, jadi tidak ada lagi nama tabel yang disusun dari data. Katalog
+ * `information_schema` hanya dibaca untuk daftar kolom.
  */
 
 export interface KanalSpend {
-  /** Awalan nama tabel, mis. "data_spend_google". */
-  prefix: string;
+  /** Tabel gabungan kanal ini, mis. "data_spend_google". */
+  tabel: string;
   /**
    * Tahun yang ditampilkan. Kosongkan untuk menampilkan semua.
-   *
-   * Tabel tahun lain tetap ada di database dan tidak dihapus — hanya
-   * disembunyikan dari halaman.
+   * Baris tahun lain tetap ada di database — hanya disembunyikan.
    */
   tahunAktif: number[];
 }
@@ -38,32 +33,15 @@ export interface KanalSpend {
 export interface SumberKanal {
   id: string;
   label: string;
+  /** Nilai kolom `sumber_tabel` — kunci sumber di tabel gabungan. */
   table: string;
-}
-
-/** Kolom yang wajib ada sebelum sebuah tabel bisa dijumlahkan. */
-const KOLOM_WAJIB = ["tanggal", "spend_iklan"];
-
-function pola(prefix: string): RegExp {
-  return new RegExp(`^${prefix}[a-z0-9_]*$`);
-}
-
-/** Tahun pada nama tabel, mis. "..._utama_2024_harian" -> 2024. */
-function tahunTabel(tabel: string): number | null {
-  const m = tabel.match(/_(20\d\d)_/);
-  return m ? Number(m[1]) : null;
-}
-
-function ditampilkan(kanal: KanalSpend, tabel: string): boolean {
-  if (kanal.tahunAktif.length === 0) return true;
-  const th = tahunTabel(tabel);
-  /* tabel tanpa tahun di namanya tetap ditampilkan */
-  return th === null || kanal.tahunAktif.includes(th);
+  produk: string;
+  tahun: number;
 }
 
 /** "data_spend_google_premium_2025_harian" → "Premium 2025" */
-function labelDariTabel(prefix: string, tabel: string): string {
-  const sisa = tabel
+function labelDariSumber(prefix: string, sumber: string): string {
+  const sisa = sumber
     .replace(new RegExp(`^${prefix}_?`), "")
     .replace(/_?harian$/, "");
   if (!sisa) return "Utama";
@@ -75,68 +53,46 @@ function labelDariTabel(prefix: string, tabel: string): string {
     .join(" ");
 }
 
-/** Tabel kanal ini yang benar-benar ada, berikut labelnya. */
+/** Sumber yang benar-benar punya baris di tabel kanal ini. */
 export async function sumberKanal(kanal: KanalSpend): Promise<SumberKanal[]> {
-  /* Alias `AS table_name` WAJIB: MariaDB mengembalikan kolom ini sebagai
-     `table_name`, tetapi MySQL 8 sebagai `TABLE_NAME` — tanpa alias,
-     row.table_name kosong dan semua tabel dianggap tidak ada (terjadi di
-     server Coolify). Sama di mp-queries.ts dan cos-queries.ts. */
-  const rows = await query<{ table_name: string }>(
-    `SELECT table_name AS table_name
-     FROM information_schema.tables
-     WHERE table_schema = DATABASE()
-       AND table_name LIKE ?
-     ORDER BY table_name`,
-    [`${kanal.prefix}%`],
+  const rows = await query<{ sumber: string; produk: string; tahun: number }>(
+    `SELECT sumber_tabel AS sumber, MIN(produk) AS produk, MIN(tahun) AS tahun
+     FROM \`${kanal.tabel}\`
+     GROUP BY sumber_tabel
+     ORDER BY sumber_tabel`,
   );
 
-  const sah = pola(kanal.prefix);
   return rows
-    .map((row) => String(row.table_name))
-    .filter((tabel) => sah.test(tabel) && ditampilkan(kanal, tabel))
-    .map((tabel) => ({
-      id: tabel.replace(new RegExp(`^${kanal.prefix}_?`), "") || "utama",
-      label: labelDariTabel(kanal.prefix, tabel),
-      table: tabel,
+    .filter(
+      (r) =>
+        kanal.tahunAktif.length === 0 ||
+        kanal.tahunAktif.includes(Number(r.tahun)),
+    )
+    .map((r) => ({
+      id: String(r.sumber).replace(new RegExp(`^${kanal.tabel}_?`), "") || "utama",
+      label: labelDariSumber(kanal.tabel, String(r.sumber)),
+      table: String(r.sumber),
+      produk: String(r.produk),
+      tahun: Number(r.tahun),
     }));
 }
 
-/** Nama kolom beberapa tabel sekaligus. */
-async function kolomTabel(prefix: string): Promise<Map<string, Set<string>>> {
-  const rows = await query<{ table_name: string; column_name: string }>(
-    `SELECT table_name AS table_name, column_name AS column_name
-     FROM information_schema.columns
-     WHERE table_schema = DATABASE()
-       AND table_name LIKE ?`,
-    [`${prefix}%`],
-  );
-
-  const kolom = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const nama = String(row.table_name);
-    if (!kolom.has(nama)) kolom.set(nama, new Set());
-    kolom.get(nama)!.add(String(row.column_name));
-  }
-  return kolom;
+/** Dipertahankan untuk pemanggil lama; semua sumber kini satu skema. */
+export function sumberTerpakai(kanal: KanalSpend): Promise<SumberKanal[]> {
+  return sumberKanal(kanal);
 }
 
-/**
- * Saring sumber yang strukturnya belum cocok.
- *
- * Tanpa ini, satu tabel dengan skema berbeda membuat seluruh halaman
- * gagal — bukan hanya baris tabel itu.
- */
-export async function sumberTerpakai(
-  kanal: KanalSpend,
-): Promise<SumberKanal[]> {
-  const sources = await sumberKanal(kanal);
-  if (sources.length === 0) return [];
-
-  const kolom = await kolomTabel(kanal.prefix);
-  return sources.filter((s) => {
-    const punya = kolom.get(s.table);
-    return punya ? KOLOM_WAJIB.every((k) => punya.has(k)) : false;
-  });
+/** Nama kolom tabel gabungan (klik & lead tidak sama namanya antar kanal). */
+async function kolomTabel(tabel: string): Promise<Set<string>> {
+  /* Alias WAJIB: MySQL 8 mengembalikan kolom information_schema dalam
+     huruf besar (COLUMN_NAME), MariaDB huruf kecil. */
+  const rows = await query<{ column_name: string }>(
+    `SELECT column_name AS column_name
+     FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = ?`,
+    [tabel],
+  );
+  return new Set(rows.map((r) => String(r.column_name)));
 }
 
 export interface BulanSumber {
@@ -147,54 +103,47 @@ export interface BulanSumber {
   lastDate: string;
 }
 
-/** Jumlah spend_iklan per bulan dari seluruh tabel kanal ini. */
+/** Jumlah spend_iklan per bulan per sumber — satu query, tanpa UNION. */
 export async function bulanSumberKanal(kanal: KanalSpend): Promise<{
   sources: SumberKanal[];
   months: BulanSumber[];
 }> {
-  const sources = await sumberTerpakai(kanal);
+  const sources = await sumberKanal(kanal);
   if (sources.length === 0) return { sources: [], months: [] };
-
-  const selects = sources.map(
-    (source) =>
-      `SELECT '${source.id}' AS sourceId,
-              DATE_FORMAT(tanggal, '%Y-%m') AS month,
-              COUNT(*) AS records,
-              COALESCE(SUM(spend_iklan), 0) AS spend,
-              MAX(tanggal) AS lastDate
-       FROM \`${source.table}\`
-       WHERE tanggal IS NOT NULL AND tanggal > '1970-01-01'
-       GROUP BY DATE_FORMAT(tanggal, '%Y-%m')`,
-  );
+  const perSumber = new Map(sources.map((s) => [s.table, s.id]));
 
   const rows = await query<Record<string, unknown>>(
-    selects.join(" UNION ALL ") + " ORDER BY month, sourceId",
+    `SELECT sumber_tabel AS sumber,
+            DATE_FORMAT(tanggal, '%Y-%m') AS month,
+            COUNT(*) AS records,
+            COALESCE(SUM(spend_iklan), 0) AS spend,
+            MAX(tanggal) AS lastDate
+     FROM \`${kanal.tabel}\`
+     WHERE tanggal IS NOT NULL AND tanggal > '1970-01-01'
+     GROUP BY sumber_tabel, DATE_FORMAT(tanggal, '%Y-%m')
+     ORDER BY month, sumber_tabel`,
   );
 
   return {
     sources,
-    months: rows.map((row) => ({
-      sourceId: String(row.sourceId),
-      month: String(row.month),
-      spend: Number(row.spend ?? 0),
-      records: Number(row.records ?? 0),
-      lastDate: String(row.lastDate),
-    })),
+    months: rows
+      .filter((row) => perSumber.has(String(row.sumber)))
+      .map((row) => ({
+        sourceId: perSumber.get(String(row.sumber))!,
+        month: String(row.month),
+        spend: Number(row.spend ?? 0),
+        records: Number(row.records ?? 0),
+        lastDate: String(row.lastDate),
+      })),
   };
 }
 
-/**
- * Nama tabel untuk sebuah id sumber.
- *
- * Dicari lewat hasil penemuan di atas, bukan disusun dari masukan: nama
- * tabel tidak bisa diparameterkan di SQL, jadi satu-satunya cara aman
- * adalah memastikan nilainya berasal dari katalog database kita sendiri.
- */
-async function tabelSumber(
+/** Nilai `sumber_tabel` untuk sebuah id sumber, atau null bila tak dikenal. */
+async function kunciSumber(
   kanal: KanalSpend,
   sourceId: string,
 ): Promise<string | null> {
-  const sources = await sumberTerpakai(kanal);
+  const sources = await sumberKanal(kanal);
   return sources.find((s) => s.id === sourceId)?.table ?? null;
 }
 
@@ -203,14 +152,16 @@ export async function bulanSatuSumber(
   kanal: KanalSpend,
   sourceId: string,
 ): Promise<string[]> {
-  const tabel = await tabelSumber(kanal, sourceId);
-  if (!tabel) return [];
+  const sumber = await kunciSumber(kanal, sourceId);
+  if (!sumber) return [];
 
   const rows = await query<{ bulan: string }>(
     `SELECT DISTINCT DATE_FORMAT(tanggal, '%Y-%m') AS bulan
-     FROM \`${tabel}\`
-     WHERE tanggal IS NOT NULL AND tanggal > '1970-01-01'
+     FROM \`${kanal.tabel}\`
+     WHERE sumber_tabel = ?
+       AND tanggal IS NOT NULL AND tanggal > '1970-01-01'
      ORDER BY bulan DESC`,
+    [sumber],
   );
   return rows.map((r) => r.bulan);
 }
@@ -226,7 +177,7 @@ export interface SpendHarianKanal {
 }
 
 /** "2026-10" → ["2026-10-01", "2026-11-01"] (batas atas eksklusif). */
-function batasBulan(bulan: string): [string, string] {
+export function batasBulan(bulan: string): [string, string] {
   const tahun = Number(bulan.slice(0, 4));
   const ke = Number(bulan.slice(5, 7));
   const akhir =
@@ -239,25 +190,19 @@ function batasBulan(bulan: string): [string, string] {
 /**
  * Spend harian satu sumber untuk satu bulan.
  *
- * Dijumlahkan per tanggal karena sebuah tabel bisa memuat beberapa baris
- * untuk hari yang sama (satu per akun iklan); tanpa agregasi, tabelnya
- * menampilkan tanggal berulang tanpa penjelasan.
- *
- * Kolom klik dan lead tidak selalu bernama sama antar kanal — hanya
- * `tanggal` dan `spend_iklan` yang diwajibkan — jadi keduanya dipilih
- * dari kolom yang memang tersedia. Google memecah klik jadi GSN dan
- * non-GSN, keduanya dijumlahkan.
+ * Dijumlahkan per tanggal karena satu sumber bisa memuat beberapa baris
+ * untuk hari yang sama (satu per akun iklan). Klik dan lead dipilih dari
+ * kolom yang tersedia: Google memecah klik jadi GSN dan non-GSN.
  */
 export async function spendHarianKanal(
   kanal: KanalSpend,
   sourceId: string,
   bulan: string,
 ): Promise<SpendHarianKanal[]> {
-  const tabel = await tabelSumber(kanal, sourceId);
-  if (!tabel) return [];
+  const sumber = await kunciSumber(kanal, sourceId);
+  if (!sumber) return [];
 
-  const ada = (await kolomTabel(kanal.prefix)).get(tabel) ?? new Set<string>();
-
+  const ada = await kolomTabel(kanal.tabel);
   const kolomKlik = [
     "klik_tautan",
     "klik_tautan_non_gsn",
@@ -266,24 +211,24 @@ export async function spendHarianKanal(
   const klik = kolomKlik.length
     ? kolomKlik.map((k) => `COALESCE(SUM(${k}), 0)`).join(" + ")
     : "NULL";
-
   const lead = ada.has("total_lead_real")
     ? "SUM(total_lead_real)"
     : ada.has("total_lead_dashboard")
       ? "SUM(total_lead_dashboard)"
       : "NULL";
 
+  const [awal, akhir] = batasBulan(bulan);
   const rows = await query<Record<string, unknown>>(
     `SELECT tanggal,
             COALESCE(SUM(spend_iklan), 0) AS spend,
             COALESCE(${klik}, 0)          AS klik,
             COALESCE(${lead}, 0)          AS lead_real,
             COUNT(*)                      AS baris
-     FROM \`${tabel}\`
-     WHERE tanggal >= ? AND tanggal < ?
+     FROM \`${kanal.tabel}\`
+     WHERE sumber_tabel = ? AND tanggal >= ? AND tanggal < ?
      GROUP BY tanggal
      ORDER BY tanggal`,
-    batasBulan(bulan),
+    [sumber, awal, akhir],
   );
 
   return rows.map((row) => ({

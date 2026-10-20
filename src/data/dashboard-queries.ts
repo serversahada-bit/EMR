@@ -85,8 +85,9 @@ export async function ringkasDashboard(
               SUM(total_lead_real) AS lead_real,
               SUM(box_total) AS box,
               MAX(tanggal) AS hari_akhir
-       FROM data_spend_meta_harian
-       WHERE tanggal >= ? AND tanggal < ?`,
+       FROM data_spend_meta
+       WHERE sumber_tabel = 'data_spend_meta_harian'
+         AND tanggal >= ? AND tanggal < ?`,
       [awal, akhir],
     ),
   ]);
@@ -130,8 +131,9 @@ export async function trenDashboard(
          itu — menggabung lintas tahun sekaligus melanggar ONLY_FULL_GROUP_BY. */
       `SELECT DATE_FORMAT(tanggal, '%Y-%m') AS bulan,
               SUM(spend_iklan) AS spend
-       FROM data_spend_meta_harian
-       WHERE tanggal >= ? AND tanggal < ?
+       FROM data_spend_meta
+       WHERE sumber_tabel = 'data_spend_meta_harian'
+         AND tanggal >= ? AND tanggal < ?
        GROUP BY DATE_FORMAT(tanggal, '%Y-%m')`,
       [awal, akhir],
     ),
