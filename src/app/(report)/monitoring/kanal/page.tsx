@@ -25,7 +25,8 @@ export default async function MonitoringKanalPage({
   }
   const bulan = diminta.bulan && daftarBulan.includes(diminta.bulan) ? diminta.bulan : daftarBulan[0];
   const rows = await dataMonitoring(bulan);
-  const ada = [...URUT_PRODUK, ALL_BRAND].filter((p) => rows.some((r) => r.produk === p));
+  // ALL BRAND paling depan (permintaan pengguna), lalu produk
+  const ada = [ALL_BRAND, ...URUT_PRODUK].filter((p) => rows.some((r) => r.produk === p));
   const produk = diminta.produk && ada.includes(diminta.produk) ? diminta.produk : null;
   const tampil = produk ? [produk] : ada;
   const url = (b: string, p: string | null) =>
@@ -39,7 +40,11 @@ export default async function MonitoringKanalPage({
       />
       <Pilihan opsi={daftarBulan.map((b) => ({ nilai: b, label: labelBulan(b) }))} aktif={bulan} href={(b) => url(b, produk)} />
       <Pilihan
-        opsi={[{ nilai: "", label: "Semua produk" }, ...ada.map((p) => ({ nilai: p, label: p }))]}
+        opsi={[
+          ...ada.filter((p) => p === ALL_BRAND).map((p) => ({ nilai: p, label: p })),
+          { nilai: "", label: "Semua produk" },
+          ...ada.filter((p) => p !== ALL_BRAND).map((p) => ({ nilai: p, label: p })),
+        ]}
         aktif={produk ?? ""}
         href={(p) => url(bulan, p || null)}
       />

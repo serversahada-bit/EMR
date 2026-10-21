@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo, useSyncExternalStore } from "react";
+
+import { aturMenu, getMenuServerSnapshot, getMenuSnapshot, subscribeMenu } from "@/lib/menuStore";
+
 import { Logo } from "./Logo";
 import {
   IconBuilding,
@@ -26,6 +30,7 @@ import {
   IconWallet,
   IconKey,
   IconTrend,
+  IconChevron,
 } from "./icons";
 
 /**
@@ -40,77 +45,91 @@ import {
  * halamannya memakai <BelumTerisi> yang menyebutkan tabel atau sheet
  * pemasoknya). Disembunyikan atas permintaan pengguna 20 Okt 2026.
  */
-const NAV = [
+type IkonMenu = (props: { size?: number; className?: string }) => React.ReactElement;
+
+interface NavItem {
+  href: string;
+  label: string;
+  Icon: IkonMenu;
+  tampil?: boolean;
+  anak?: NavItem[];
+}
+
+const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", Icon: IconGrid, tampil: true },
   { href: "/omset", label: "Omset", Icon: IconCoins, tampil: true },
   {
+    /* Menu induk kanal pemasaran (permintaan pengguna 21 Okt 2026): Meta,
+       Google, Snack, Marketplace, dan CRM jadi sub-menu Marketing report. */
     href: "/monitoring",
     label: "Marketing report",
     Icon: IconTrend,
     tampil: true,
-    anak: [{ href: "/monitoring/kanal", label: "Per kanal", Icon: IconDocument }],
-  },
-  {
-    href: "/meta",
-    label: "Meta Ads",
-    Icon: IconMeta,
-    tampil: true,
     anak: [
+      { href: "/monitoring/kanal", label: "Per kanal", Icon: IconDocument },
       {
-        href: "/meta/spend-iklan",
-        label: "Tabel spend iklan",
-        Icon: IconDocument,
+        href: "/meta",
+        label: "Meta Ads",
+        Icon: IconMeta,
+        tampil: true,
+        anak: [
+          {
+            href: "/meta/spend-iklan",
+            label: "Tabel spend iklan",
+            Icon: IconDocument,
+          },
+        ],
       },
-    ],
-  },
-  {
-    href: "/google",
-    label: "Google Ads",
-    Icon: IconGoogle,
-    tampil: true,
-    anak: [
       {
-        href: "/google/spend-iklan",
-        label: "Tabel spend iklan",
-        Icon: IconDocument,
+        href: "/google",
+        label: "Google Ads",
+        Icon: IconGoogle,
+        tampil: true,
+        anak: [
+          {
+            href: "/google/spend-iklan",
+            label: "Tabel spend iklan",
+            Icon: IconDocument,
+          },
+        ],
       },
-    ],
-  },
-  {
-    href: "/snack",
-    label: "Snack Video",
-    Icon: IconSnack,
-    tampil: true,
-    anak: [
       {
-        href: "/snack/spend-iklan",
-        label: "Tabel spend iklan",
-        Icon: IconDocument,
+        href: "/snack",
+        label: "Snack Video",
+        Icon: IconSnack,
+        tampil: true,
+        anak: [
+          {
+            href: "/snack/spend-iklan",
+            label: "Tabel spend iklan",
+            Icon: IconDocument,
+          },
+        ],
       },
-    ],
-  },
-  {
-    href: "/marketplace",
-    label: "Marketplace",
-    Icon: IconStore,
-    tampil: true,
-    anak: [
       {
-        href: "/marketplace/spend-iklan",
-        label: "Tabel spend iklan",
-        Icon: IconDocument,
+        href: "/marketplace",
+        label: "Marketplace",
+        Icon: IconStore,
+        tampil: true,
+        anak: [
+          {
+            href: "/marketplace/spend-iklan",
+            label: "Tabel spend iklan",
+            Icon: IconDocument,
+          },
+        ],
       },
-    ],
-  },
-  {
-    href: "/crm",
-    label: "CRM & blast",
-    Icon: IconChat,
-    tampil: true,
-    anak: [
-      { href: "/crm/blast", label: "Blast CRM", Icon: IconDocument },
-      { href: "/crm/cs", label: "Performa CS", Icon: IconDocument },
-      { href: "/crm/ro", label: "Repeat order", Icon: IconDocument },
+      {
+        href: "/crm",
+        label: "CRM & blast",
+        Icon: IconChat,
+        tampil: true,
+        anak: [
+          { href: "/crm/blast", label: "Blast CRM", Icon: IconDocument },
+          { href: "/crm/cs", label: "Performa CS", Icon: IconDocument },
+          { href: "/crm/ro", label: "Repeat order", Icon: IconDocument },
+        ],
+      },
     ],
   },
   {
@@ -161,22 +180,35 @@ const NAV = [
 interface ItemMenu {
   href: string;
   label: string;
-  Icon: (props: { size?: number; className?: string }) => React.ReactElement;
-  /** Benar untuk sub-menu; dipakai menggeser indentasinya. */
-  anak: boolean;
+  Icon: IkonMenu;
+  /** 0 = menu utama, 1 = sub-menu, 2 = sub-sub-menu. */
+  tingkat: number;
+  /** href semua induknya; item tampil hanya bila semuanya terbuka. */
+  leluhur: string[];
+  /** href semua keturunannya; >0 berarti menu ini punya sub-menu. */
+  keturunan: string[];
 }
 
 /**
  * Pohon menu diratakan jadi satu daftar untuk dirender.
  *
- * Sub-menu selalu ikut tampil, tidak hanya saat induknya aktif: dengan
- * satu anak saja, menyembunyikannya hanya membuat halaman itu sulit
- * ditemukan tanpa menghemat ruang yang berarti.
+ * Menu yang punya sub-menu bisa dibuka-tutup lewat tombol panah, dan
+ * terbuka sendiri saat nama menu induknya diklik. Selain itu tertutup,
+ * supaya sidebar tidak memanjang. Pilihan diingat di browser (menuStore).
  */
-const MENU: ItemMenu[] = NAV.filter((item) => item.tampil).flatMap((item) => [
-  { href: item.href, label: item.label, Icon: item.Icon, anak: false },
-  ...(item.anak ?? []).map((sub) => ({ ...sub, anak: true })),
-]);
+function ratakan(items: NavItem[], tingkat = 0, leluhur: string[] = []): ItemMenu[] {
+  return items
+    .filter((it) => it.tampil !== false)
+    .flatMap((it) => {
+      const bawah = ratakan(it.anak ?? [], tingkat + 1, [...leluhur, it.href]);
+      return [
+        { href: it.href, label: it.label, Icon: it.Icon, tingkat, leluhur, keturunan: bawah.map((b) => b.href) },
+        ...bawah,
+      ];
+    });
+}
+
+const MENU: ItemMenu[] = ratakan(NAV);
 
 export function Sidebar({
   expanded,
@@ -186,6 +218,17 @@ export function Sidebar({
   onToggle: () => void;
 }) {
   const pathname = usePathname();
+  const simpanan = useSyncExternalStore(subscribeMenu, getMenuSnapshot, getMenuServerSnapshot);
+  const pilihan = useMemo<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(simpanan);
+    } catch {
+      return {};
+    }
+  }, [simpanan]);
+  /* Sub-menu TERTUTUP sampai diklik (permintaan pengguna): lewat panah,
+     atau dengan mengeklik nama menu induknya. */
+  const terbuka = (href: string) => pilihan[href] ?? false;
 
   return (
     <nav
@@ -250,8 +293,10 @@ export function Sidebar({
           (expanded ? "" : "items-center")
         }
       >
-        {MENU.map((item) => {
+        {MENU.filter((item) => item.leluhur.every(terbuka)).map((item) => {
           const isActive = pathname === item.href;
+          const punyaAnak = item.keturunan.length > 0;
+          const buka = punyaAnak && terbuka(item.href);
 
           return (
             <li
@@ -260,13 +305,16 @@ export function Sidebar({
             >
               <Link
                 href={item.href}
+                onClick={punyaAnak ? () => aturMenu(item.href, true) : undefined}
                 aria-current={isActive ? "page" : undefined}
                 className={
                   "flex items-center rounded-xl transition-colors " +
                   (expanded
-                    ? item.anak
-                      ? "h-9 w-full gap-3 pl-7 pr-3"
-                      : "h-10 w-full gap-3 px-3"
+                    ? (item.tingkat === 2
+                        ? "h-8 w-full gap-2.5 pl-11 "
+                        : item.tingkat === 1
+                          ? "h-9 w-full gap-3 pl-7 "
+                          : "h-10 w-full gap-3 pl-3 ") + (punyaAnak ? "pr-9" : "pr-3")
                     : "h-10 w-10 justify-center")
                 }
                 style={{
@@ -276,13 +324,13 @@ export function Sidebar({
               >
                 <item.Icon
                   className="shrink-0"
-                  size={expanded && item.anak ? 16 : 18}
+                  size={expanded && item.tingkat > 0 ? (item.tingkat === 2 ? 14 : 16) : 18}
                 />
                 {expanded ? (
                   <span
                     className={
                       "truncate font-medium " +
-                      (item.anak ? "text-[12px]" : "text-[13px]")
+                      (item.tingkat === 2 ? "text-[11.5px]" : item.tingkat === 1 ? "text-[12px]" : "text-[13px]")
                     }
                     style={{ color: isActive ? "var(--s1)" : "var(--ink-2)" }}
                   >
@@ -292,6 +340,19 @@ export function Sidebar({
                   <span className="sr-only">{item.label}</span>
                 )}
               </Link>
+
+              {punyaAnak && expanded ? (
+                <button
+                  type="button"
+                  onClick={() => aturMenu(item.href, !buka)}
+                  aria-expanded={buka}
+                  title={buka ? "Tutup sub-menu" : "Buka sub-menu"}
+                  className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-muted transition-colors hover:bg-page hover:text-ink"
+                >
+                  <IconChevron size={15} className={"transition-transform " + (buka ? "" : "-rotate-90")} />
+                  <span className="sr-only">{buka ? "Tutup" : "Buka"} sub-menu {item.label}</span>
+                </button>
+              ) : null}
 
               {/* Saat menu kecil, label muncul sebagai tooltip ketika hover */}
               {!expanded ? (

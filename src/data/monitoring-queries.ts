@@ -88,12 +88,13 @@ export async function dataMonitoring(bulan: string): Promise<BarisMonitoring[]> 
 
 /** Ringkasan per bulan dari blok ALL BRAND sheet: omset neto, spend, box, target box. */
 export async function trenMonitoring(): Promise<
-  { bulan: string; omset: number; spend: number; box: number; targetBox: number }[]
+  { bulan: string; omset: number; spend: number; box: number; targetBox: number; targetCos: number | null }[]
 > {
   const rows = await query<Record<string, unknown>>(
     `SELECT CONCAT(tahun, '-', LPAD(bulan_no, 2, '0')) AS b,
             COALESCE(SUM(omset), 0) AS omset, COALESCE(SUM(realisasi_spend), 0) AS spend,
-            COALESCE(SUM(box), 0) AS box, COALESCE(SUM(target_box), 0) AS target_box
+            COALESCE(SUM(box), 0) AS box, COALESCE(SUM(target_box), 0) AS target_box,
+            MAX(target_cos) AS target_cos
        FROM data_monitoring_kanal WHERE agregat = 1 AND produk = 'ALL BRAND'
       GROUP BY tahun, bulan_no ORDER BY tahun, bulan_no`,
   ).catch(() => []);
@@ -103,5 +104,6 @@ export async function trenMonitoring(): Promise<
     spend: Number(r.spend),
     box: Number(r.box),
     targetBox: Number(r.target_box),
+    targetCos: r.target_cos === null || r.target_cos === undefined ? null : Number(r.target_cos),
   }));
 }
