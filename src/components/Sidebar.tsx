@@ -25,6 +25,7 @@ import {
   IconMegaphone,
   IconWallet,
   IconKey,
+  IconTrend,
 } from "./icons";
 
 /**
@@ -42,6 +43,13 @@ import {
 const NAV = [
   { href: "/", label: "Dashboard", Icon: IconGrid, tampil: true },
   { href: "/omset", label: "Omset", Icon: IconCoins, tampil: true },
+  {
+    href: "/monitoring",
+    label: "Marketing report",
+    Icon: IconTrend,
+    tampil: true,
+    anak: [{ href: "/monitoring/kanal", label: "Per kanal", Icon: IconDocument }],
+  },
   {
     href: "/meta",
     label: "Meta Ads",

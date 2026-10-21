@@ -73,6 +73,8 @@ const RUTE_DATA_RIIL = [
   "/marketplace/spend-iklan",
   "/roas",
   "/roas/cos-harian",
+  "/monitoring",
+  "/monitoring/kanal",
   "/crm",
   "/crm/blast",
   "/crm/cs",
