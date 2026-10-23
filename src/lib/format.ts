@@ -40,6 +40,17 @@ export function formatCompact(value: number, digits = 1): string {
   return `${sign}${nf(abs, 0)}`;
 }
 
+/**
+ * Tick sumbu ringkas: "1,5 M", "2 M", "500 jt".
+ *
+ * Satu desimal hanya bila perlu. `formatCompact(v, 0)` membulatkan 1,5 M
+ * menjadi "2 M", sehingga dua garis bantu berlabel sama ("2 M", "2 M")
+ * dan grafik bisa salah dibaca.
+ */
+export function formatTickCompact(value: number): string {
+  return formatCompact(value, 1).replace(/,0(?= )/, "");
+}
+
 /** 1.284 — ribuan dengan titik sesuai kaidah Indonesia. */
 export function formatNumber(value: number, digits = 0): string {
   return nf(value, digits);

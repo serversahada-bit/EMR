@@ -15,7 +15,7 @@ import {
   IconTrend,
 } from "./icons";
 import {
-  formatCompact,
+  formatTickCompact,
   formatIDR,
   formatIDRPenuh,
   formatNumber,
@@ -224,7 +224,7 @@ export function KanalRingkasView({
               height={210}
               zeroBased
               formatValue={formatIDR}
-              formatTick={(value) => formatCompact(value, 0)}
+              formatTick={formatTickCompact}
               series={[
                 {
                   id: "spend",

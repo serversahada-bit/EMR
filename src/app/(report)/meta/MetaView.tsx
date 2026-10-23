@@ -10,7 +10,7 @@ import { MonthPicker, labelBulan } from "@/components/MonthPicker";
 import { PageHead } from "@/components/PageHead";
 import { IconCoins, IconDocument, IconMegaphone, IconTrend } from "@/components/icons";
 import {
-  formatCompact,
+  formatTickCompact,
   formatIDR,
   formatIDRPenuh,
   formatNumber,
@@ -165,7 +165,7 @@ export function MetaView({ data }: { data: MetaReportData }) {
               height={210}
               zeroBased
               formatValue={formatIDR}
-              formatTick={(value) => formatCompact(value, 0)}
+              formatTick={formatTickCompact}
               series={[{
                 id: "spend",
                 label: "Spend Meta",

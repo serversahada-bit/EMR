@@ -16,7 +16,7 @@ import {
 } from "@/components/columns";
 import { COST_PARTS } from "@/data/costParts";
 import {
-  formatCompact,
+  formatTickCompact,
   formatIDR,
   formatNumber,
   formatPercent,
@@ -50,7 +50,7 @@ export default function BiayaPage() {
               categories={series}
               height={228}
               formatValue={(v) => formatIDR(v)}
-              formatTick={(v) => formatCompact(v, 0)}
+              formatTick={formatTickCompact}
               totalLabel="Total biaya"
               series={COST_PARTS.map((part) => ({
                 id: part.id,
@@ -105,7 +105,7 @@ export default function BiayaPage() {
               }))}
               height={196}
               formatValue={(v) => formatIDR(v)}
-              formatTick={(v) => formatCompact(v, 0)}
+              formatTick={formatTickCompact}
               totalLabel="Total biaya"
               series={[
                 {
@@ -208,7 +208,7 @@ export default function BiayaPage() {
               height={188}
               seriesLabel="Arus kas bersih"
               formatValue={(v) => formatIDR(v)}
-              formatTick={(v) => formatCompact(v, 0)}
+              formatTick={formatTickCompact}
             />
           }
           table={
