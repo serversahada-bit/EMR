@@ -88,6 +88,41 @@ export function batasBulan(bulan: string): [string, string] {
   return [awal, akhir];
 }
 
+/** "2026-09" → 30. */
+export function hariDalamBulan(bulan: string): number {
+  return new Date(
+    Date.UTC(Number(bulan.slice(0, 4)), Number(bulan.slice(5, 7)), 0),
+  ).getUTCDate();
+}
+
+/** Batas atas eksklusif untuk "tanggal 1 s/d hari ke-`hari`" di `bulan`. */
+export function batasHari(bulan: string, hari: number): string {
+  if (hari >= hariDalamBulan(bulan)) return batasBulan(bulan)[1];
+  return `${bulan}-${String(hari + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Hari ke-N tempat bulan pembanding dipotong agar setara dengan `bulan`
+ * yang belum selesai — Oktober 1–23 lawan September 1–23, bukan lawan
+ * September penuh (itu membuat omset tampak turun 22% padahal cuma kurang
+ * 8 hari). `tanggalTerakhir` = tanggal terakhir yang ada datanya di
+ * `bulan`; patokannya data, bukan kalender, karena data hari ini belum
+ * tentu sudah masuk.
+ *
+ * Null = bandingkan penuh lawan penuh: `bulan` sudah lengkap, atau
+ * potongannya mencakup seluruh bulan pembanding (30 Maret lawan Februari).
+ */
+export function hariSetara(
+  bulan: string,
+  bulanSebelum: string,
+  tanggalTerakhir: string | null,
+): number | null {
+  if (!tanggalTerakhir?.startsWith(bulan)) return null;
+  const hari = Number(tanggalTerakhir.slice(8, 10));
+  if (hari >= hariDalamBulan(bulan)) return null;
+  return hari >= hariDalamBulan(bulanSebelum) ? null : hari;
+}
+
 /** Awal rentang untuk `jumlahBulan` bulan yang berakhir di `bulan`. */
 function awalRentangBulan(bulan: string, jumlahBulan: number): string {
   const tahun = Number(bulan.slice(0, 4));
@@ -145,6 +180,8 @@ export interface OmsetRingkas {
   ongkir: number;
   fee: number;
   diskon: number;
+  /** Tanggal transaksi terakhir dalam rentang — patokan `hariSetara`. */
+  hariTerakhir: string | null;
 }
 
 export interface OmsetPerAdv {
@@ -213,8 +250,16 @@ export async function omsetPerHari(bulan: string): Promise<OmsetHarian[]> {
   }));
 }
 
-export async function ringkasBulan(bulan: string): Promise<OmsetRingkas> {
-  const [awal, akhir] = batasBulan(bulan);
+/**
+ * Ringkasan satu bulan. Dengan `sampaiHari`, hanya tanggal 1 s/d hari itu
+ * yang dihitung — untuk bulan pembanding (lihat `hariSetara`).
+ */
+export async function ringkasBulan(
+  bulan: string,
+  sampaiHari?: number,
+): Promise<OmsetRingkas> {
+  const [awal, akhirBulan] = batasBulan(bulan);
+  const akhir = sampaiHari ? batasHari(bulan, sampaiHari) : akhirBulan;
 
   const rows = await query<Record<string, unknown>>(
     `SELECT COUNT(*)       AS transaksi,
@@ -223,7 +268,8 @@ export async function ringkasBulan(bulan: string): Promise<OmsetRingkas> {
             SUM(${money("total_harga")}) AS harga,
             SUM(${money("ongkir")})      AS ongkir,
             SUM(${money("fee")})         AS fee,
-            SUM(${money("diskon")})      AS diskon
+            SUM(${money("diskon")})      AS diskon,
+            MAX(tanggal_proses)          AS hari_akhir
      FROM data_transaksi
      WHERE tanggal_proses >= ? AND tanggal_proses < ?`,
     [awal, akhir],
@@ -238,6 +284,7 @@ export async function ringkasBulan(bulan: string): Promise<OmsetRingkas> {
     ongkir: num(row.ongkir),
     fee: num(row.fee),
     diskon: num(row.diskon),
+    hariTerakhir: (row.hari_akhir as string) ?? null,
   };
 }
 
@@ -325,8 +372,12 @@ export async function omsetPerAdv(
 }
 
 /** Customer baru pada bulan tersebut (tanggal registrasi). */
-export async function customerBaru(bulan: string): Promise<number> {
-  const [awal, akhir] = batasBulan(bulan);
+export async function customerBaru(
+  bulan: string,
+  sampaiHari?: number,
+): Promise<number> {
+  const [awal, akhirBulan] = batasBulan(bulan);
+  const akhir = sampaiHari ? batasHari(bulan, sampaiHari) : akhirBulan;
 
   const rows = await query<{ jumlah: unknown }>(
     `SELECT COUNT(*) AS jumlah

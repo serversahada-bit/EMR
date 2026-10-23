@@ -25,7 +25,7 @@ import type {
   MutuData,
 } from "@/data/omset-queries";
 import {
-  formatCompact,
+  formatTickCompact,
   formatCount,
   formatIDR,
   formatIDRPenuh,
@@ -40,6 +40,8 @@ export interface OmsetData {
   ringkas: OmsetRingkas;
   ringkasSebelum: OmsetRingkas | null;
   bulanSebelum: string | null;
+  /** Bulan pembanding dihitung s/d hari ini saja; null = bulan penuh. */
+  hariPembanding: number | null;
   tren: OmsetBulan[];
   perAdv: OmsetPerAdv[];
   customerBaru: number;
@@ -55,6 +57,7 @@ export function OmsetView({ data }: { data: OmsetData }) {
     ringkas,
     ringkasSebelum,
     bulanSebelum,
+    hariPembanding,
     tren,
     perAdv,
     customerBaru,
@@ -75,8 +78,13 @@ export function OmsetView({ data }: { data: OmsetData }) {
     longLabel: labelBulan(row.bulan),
   }));
 
-  const pembanding = bulanSebelum
-    ? "vs " + labelBulan(bulanSebelum)
+  /* "1–23 September 2026" saat bulan ini belum selesai — sama dengan
+     dashboard, supaya delta kedua halaman bisa dicocokkan. */
+  const periodeSebelum = bulanSebelum
+    ? (hariPembanding ? `1–${hariPembanding} ` : "") + labelBulan(bulanSebelum)
+    : null;
+  const pembanding = periodeSebelum
+    ? "vs " + periodeSebelum
     : "tanpa pembanding";
 
   /* Diskon mengurangi omset, jadi ditampilkan terpisah, bukan
@@ -198,7 +206,7 @@ export function OmsetView({ data }: { data: OmsetData }) {
                 categories={hariKategori}
                 height={224}
                 formatValue={(v) => formatIDR(v)}
-                formatTick={(v) => formatCompact(v, 0)}
+                formatTick={formatTickCompact}
                 totalLabel="Omset"
                 series={[
                   {
@@ -279,7 +287,7 @@ export function OmsetView({ data }: { data: OmsetData }) {
               height={196}
               zeroBased
               formatValue={(v) => formatIDR(v)}
-              formatTick={(v) => formatCompact(v, 0)}
+              formatTick={formatTickCompact}
               series={[
                 {
                   id: "omset",
@@ -330,7 +338,7 @@ export function OmsetView({ data }: { data: OmsetData }) {
       {ringkasSebelum && bulanSebelum ? (
         <Card className="mt-4 p-5">
           <h2 className="text-[15px] font-semibold leading-tight text-ink">
-            Perbandingan dengan {labelBulan(bulanSebelum)}
+            Perbandingan dengan {periodeSebelum}
           </h2>
           <dl className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[

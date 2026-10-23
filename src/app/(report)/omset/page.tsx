@@ -2,6 +2,7 @@ import { Card } from "@/components/Card";
 import { PageHead } from "@/components/PageHead";
 import {
   customerBaru,
+  hariSetara,
   listBulan,
   mutuData,
   omsetPerAdv,
@@ -62,10 +63,16 @@ async function ambilData(bulanDiminta?: string): Promise<Hasil> {
         ? (bulanData.find((item) => item < bulan) ?? null)
         : null;
 
+    /* Bulan yang belum selesai dibandingkan dengan rentang tanggal yang
+       sama di bulan sebelumnya — aturan yang sama dengan dashboard. */
+    const hariPembanding = bulanSebelum
+      ? hariSetara(bulan, bulanSebelum, ringkas.hariTerakhir)
+      : null;
+
     const [ringkasSebelum, custBaruSebelum] = bulanSebelum
       ? await Promise.all([
-          ringkasBulan(bulanSebelum),
-          customerBaru(bulanSebelum),
+          ringkasBulan(bulanSebelum, hariPembanding ?? undefined),
+          customerBaru(bulanSebelum, hariPembanding ?? undefined),
         ])
       : [null, null];
 
@@ -78,6 +85,7 @@ async function ambilData(bulanDiminta?: string): Promise<Hasil> {
         ringkas,
         ringkasSebelum,
         bulanSebelum,
+        hariPembanding,
         tren,
         perAdv,
         customerBaru: custBaru,

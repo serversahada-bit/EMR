@@ -2,6 +2,7 @@ import { Card } from "@/components/Card";
 import { PageHead } from "@/components/PageHead";
 import {
   omsetPerChannel,
+  potongSetara,
   ringkasDashboard,
   trenDashboard,
 } from "@/data/dashboard-queries";
@@ -56,8 +57,15 @@ async function ambilData(bulanDiminta?: string): Promise<Hasil> {
         ? (bulanData.find((item) => item < bulan) ?? null)
         : null;
 
+    /* Bulan yang belum selesai dibandingkan dengan rentang tanggal yang
+       sama di bulan sebelumnya (1–22 Okt lawan 1–22 Sep), bukan dengan
+       bulan sebelumnya penuh. Bulan yang sudah lengkap: penuh lawan penuh. */
+    const potong = bulanSebelum
+      ? potongSetara(bulan, bulanSebelum, ringkas)
+      : null;
+
     const ringkasSebelum = bulanSebelum
-      ? await ringkasDashboard(bulanSebelum)
+      ? await ringkasDashboard(bulanSebelum, potong ?? undefined)
       : null;
 
     return {
@@ -68,6 +76,7 @@ async function ambilData(bulanDiminta?: string): Promise<Hasil> {
         ringkas,
         ringkasSebelum,
         bulanSebelum,
+        potong,
         tren,
         channel,
       },
