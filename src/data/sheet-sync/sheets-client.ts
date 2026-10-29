@@ -48,11 +48,15 @@ function apiKey(): string {
   return kunci;
 }
 
-async function panggil<T>(
+/** Nilai array dikirim berulang (`ranges=a&ranges=b`) — dipakai batchGet. */
+export async function panggil<T>(
   jalur: string,
-  params: Record<string, string>,
+  params: Record<string, string | string[]>,
 ): Promise<T> {
-  const query = new URLSearchParams({ ...params, key: apiKey() });
+  const query = new URLSearchParams({ key: apiKey() });
+  for (const [k, v] of Object.entries(params)) {
+    for (const x of Array.isArray(v) ? v : [v]) query.append(k, x);
+  }
   const respons = await fetch(`${BASE}/${jalur}?${query}`, {
     cache: "no-store",
   });

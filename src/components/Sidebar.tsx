@@ -56,17 +56,38 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Dashboard", Icon: IconGrid, tampil: true },
+  {
+    /* Sub-dashboard analitik (29 Okt 2026) — semua dari data_transaksi. */
+    href: "/",
+    label: "Dashboard",
+    Icon: IconGrid,
+    tampil: true,
+    anak: [
+      { href: "/dashboard/penjualan", label: "Penjualan", Icon: IconDocument },
+      { href: "/dashboard/produk", label: "Produk", Icon: IconDocument },
+      { href: "/dashboard/wilayah", label: "Wilayah", Icon: IconDocument },
+    ],
+  },
   { href: "/omset", label: "Omset", Icon: IconCoins, tampil: true },
   {
-    /* Menu induk kanal pemasaran (permintaan pengguna 21 Okt 2026): Meta,
-       Google, Snack, Marketplace, dan CRM jadi sub-menu Marketing report. */
+    /* Realtime dari sheet Marketing Report. Kanal Meta, Google, Snack,
+       Marketplace, dan CRM pindah ke "Rekap data tahunan" (29 Okt 2026). */
     href: "/monitoring",
-    label: "Marketing report",
+    label: "Realtime Omset Per Kanal",
     Icon: IconTrend,
     tampil: true,
     anak: [
       { href: "/monitoring/kanal", label: "Per kanal", Icon: IconDocument },
+    ],
+  },
+  {
+    /* Rekap per kanal dari file Progres (data impor, bukan realtime) —
+       dipisah dari menu realtime atas permintaan pengguna 29 Okt 2026. */
+    href: "/rekap",
+    label: "Rekap data tahunan",
+    Icon: IconMegaphone,
+    tampil: true,
+    anak: [
       {
         href: "/meta",
         label: "Meta Ads",
@@ -130,6 +151,8 @@ const NAV: NavItem[] = [
           { href: "/crm/ro", label: "Repeat order", Icon: IconDocument },
         ],
       },
+      /* Dipindah dari ROAS & efisiensi (29 Okt 2026): sumbernya juga impor Progres. */
+      { href: "/roas/cos-harian", label: "Tabel COS harian", Icon: IconDocument },
     ],
   },
   {
@@ -137,13 +160,6 @@ const NAV: NavItem[] = [
     label: "ROAS & efisiensi",
     Icon: IconPercent,
     tampil: true,
-    anak: [
-      {
-        href: "/roas/cos-harian",
-        label: "Tabel COS harian",
-        Icon: IconDocument,
-      },
-    ],
   },
   { href: "/adv", label: "Performa ADV", Icon: IconMegaphone, tampil: false },
   {
@@ -153,8 +169,10 @@ const NAV: NavItem[] = [
     tampil: false,
   },
   { href: "/customer", label: "Data customer", Icon: IconUsers, tampil: true },
+  { href: "/spreadsheet", label: "Spreadsheet live", Icon: IconDocument, tampil: true },
   { href: "/mutu-data", label: "Mutu data", Icon: IconShield, tampil: false },
   { href: "/sync", label: "Sync Sheet", Icon: IconSync, tampil: true },
+  { href: "/import", label: "Import Progres", Icon: IconSync, tampil: true },
   {
     href: "/setingan/produk",
     label: "Setingan produk",

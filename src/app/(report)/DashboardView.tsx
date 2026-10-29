@@ -8,6 +8,7 @@ import { LineChart } from "@/components/LineChart";
 import { TintedList } from "@/components/Lists";
 import { MonthPicker, labelBulan } from "@/components/MonthPicker";
 import { PageHead } from "@/components/PageHead";
+import { KerangkaGrafik, Tunggu } from "@/components/Tunggu";
 import {
   IconCoins,
   IconDocument,
@@ -37,7 +38,9 @@ export interface DashboardData {
   bulanSebelum: string | null;
   /** Rentang tanggal pembanding bila bulan ini belum selesai; null = penuh. */
   potong: PotongPeriode | null;
-  tren: TitikTren[];
+  /** Dikirim sebagai Promise: tren 12 bulan termasuk query terberat, jadi
+   *  kartu dan channel tampil dulu, tren menyusul. null = gagal dimuat. */
+  tren: Promise<TitikTren[] | null>;
   channel: OmsetChannel[];
 }
 
@@ -93,11 +96,6 @@ export function DashboardView({ data }: { data: DashboardData }) {
   const pembandingTransaksi = labelPembanding(potong?.hariTransaksi);
   const pembandingBiaya = labelPembanding(potong?.hariBiaya);
 
-  const kategori = tren.map((t) => ({
-    label: labelBulan(t.bulan).slice(0, 3),
-    longLabel: labelBulan(t.bulan),
-  }));
-
   const aov = bagi(ringkas.omset, ringkas.transaksi);
 
   const pembandingCos =
@@ -113,6 +111,28 @@ export function DashboardView({ data }: { data: DashboardData }) {
     ringkas.hariTerakhirIklan !== null &&
     ringkas.hariTerakhirTransaksi !== null &&
     ringkas.hariTerakhirIklan < ringkas.hariTerakhirTransaksi;
+
+  const kartuOmset = {
+    label: "Omset",
+    value: formatIDRPenuh(ringkas.omset),
+    icon: IconCoins,
+    tint: "var(--tint-s1)",
+    color: "var(--s1)",
+    delta: delta((r) => r.omset),
+    comparison: pembandingTransaksi,
+  };
+  const kartuBiaya = {
+    label: "Biaya pemasaran",
+    value: formatIDRPenuh(ringkas.spendIklan),
+    icon: IconMegaphone,
+    tint: "var(--tint-s3)",
+    color: "var(--s3)",
+    delta: delta((r) => r.spendIklan),
+    /* Biaya naik bukan kabar baik dengan sendirinya — yang menentukan
+       adalah COS di kartu sebelah. */
+    upIsGood: false,
+    comparison: pembandingBiaya,
+  };
 
   return (
     <>
@@ -144,29 +164,13 @@ export function DashboardView({ data }: { data: DashboardData }) {
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          label="Omset"
-          value={formatIDRPenuh(ringkas.omset)}
-          icon={IconCoins}
-          tint="var(--tint-s1)"
-          color="var(--s1)"
-          delta={delta((r) => r.omset)}
-          comparison={pembandingTransaksi}
-          trend={tren.map((t) => t.omset)}
-        />
-        <KpiCard
-          label="Biaya pemasaran"
-          value={formatIDRPenuh(ringkas.spendIklan)}
-          icon={IconMegaphone}
-          tint="var(--tint-s3)"
-          color="var(--s3)"
-          delta={delta((r) => r.spendIklan)}
-          /* Biaya naik bukan kabar baik dengan sendirinya — yang
-             menentukan adalah COS di kartu sebelah. */
-          upIsGood={false}
-          comparison={pembandingBiaya}
-          trend={tren.map((t) => t.spendIklan)}
-        />
+        {/* Angka kartu langsung tampil; garis tren kecilnya menyusul. */}
+        <Tunggu janji={tren} cadangan={<KpiCard {...kartuOmset} />}>
+          {(t) => <KpiCard {...kartuOmset} trend={t?.map((x) => x.omset)} />}
+        </Tunggu>
+        <Tunggu janji={tren} cadangan={<KpiCard {...kartuBiaya} />}>
+          {(t) => <KpiCard {...kartuBiaya} trend={t?.map((x) => x.spendIklan)} />}
+        </Tunggu>
         <KpiCard
           label="COS (biaya ÷ omset)"
           value={cos === null ? "—" : formatPercent(cos * 100)}
@@ -198,43 +202,54 @@ export function DashboardView({ data }: { data: DashboardData }) {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-12">
-        <ChartFrame
-          className="lg:col-span-8"
-          title="Omset dan biaya pemasaran"
-          subtitle="12 bulan terakhir"
-          footnote="Biaya pemasaran = spend total sheet Cost of Sales semua produk: konversi (Meta, Google, marketplace, TikTok), sales promotion (CRM/CSO), dan MBC (Marcom). COS = biaya pemasaran ÷ omset."
-          chart={
-            <LineChart
-              categories={kategori}
-              height={224}
-              zeroBased
-              formatValue={(v) => formatIDR(v)}
-              formatTick={formatTickCompact}
-              series={[
-                {
-                  id: "omset",
-                  label: "Omset",
-                  color: "var(--s1)",
-                  values: tren.map((t) => t.omset),
-                  labelEnd: true,
-                },
-                {
-                  id: "iklan",
-                  label: "Biaya pemasaran",
-                  color: "var(--s3)",
-                  values: tren.map((t) => t.spendIklan),
-                },
-              ]}
-            />
+        <Tunggu
+          janji={tren}
+          cadangan={<KerangkaGrafik className="lg:col-span-8" judul="Omset dan biaya pemasaran" sub="12 bulan terakhir" tinggi={224} />}
+        >
+          {(t) =>
+            t ? (
+                <ChartFrame
+                  className="lg:col-span-8"
+                  title="Omset dan biaya pemasaran"
+                  subtitle="12 bulan terakhir"
+                  footnote="Biaya pemasaran = spend total sheet Cost of Sales semua produk: konversi (Meta, Google, marketplace, TikTok), sales promotion (CRM/CSO), dan MBC (Marcom). COS = biaya pemasaran ÷ omset."
+                  chart={
+                    <LineChart
+                      categories={t.map((x) => ({ label: labelBulan(x.bulan).slice(0, 3), longLabel: labelBulan(x.bulan) }))}
+                      height={224}
+                      zeroBased
+                      formatValue={(v) => formatIDR(v)}
+                      formatTick={formatTickCompact}
+                      series={[
+                        {
+                          id: "omset",
+                          label: "Omset",
+                          color: "var(--s1)",
+                          values: t.map((x) => x.omset),
+                          labelEnd: true,
+                        },
+                        {
+                          id: "iklan",
+                          label: "Biaya pemasaran",
+                          color: "var(--s3)",
+                          values: t.map((x) => x.spendIklan),
+                        },
+                      ]}
+                    />
+                  }
+                  table={
+                    <DataTable
+                      rows={t}
+                      rowKey={(row) => row.bulan}
+                      columns={kolomTren}
+                    />
+                  }
+                />
+            ) : (
+              <Card className="p-5 text-sm text-ink-2 lg:col-span-8">Grafik tren gagal dimuat. Coba muat ulang halaman.</Card>
+            )
           }
-          table={
-            <DataTable
-              rows={tren}
-              rowKey={(row) => row.bulan}
-              columns={kolomTren}
-            />
-          }
-        />
+        </Tunggu>
 
         <Card className="p-5 lg:col-span-4">
           <h2 className="text-[15px] font-semibold leading-tight text-ink">

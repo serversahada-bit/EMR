@@ -48,10 +48,12 @@ async function ambilData(bulanDiminta?: string): Promise<Hasil> {
         ? bulanDiminta
         : bulanKini;
 
-    const [harian, ringkas, tren, perAdv, custBaru, mutu] = await Promise.all([
+    /* Tren 12 bulan (±1,5 dtk) TIDAK ditunggu — dikirim sebagai Promise,
+       kartu dan grafik harian tampil dulu (lihat <Tunggu>). */
+    const tren = omsetPerBulan(bulan, 12).catch(() => null);
+    const [harian, ringkas, perAdv, custBaru, mutu] = await Promise.all([
       omsetPerHari(bulan),
       ringkasBulan(bulan),
-      omsetPerBulan(bulan, 12),
       omsetPerAdv(bulan, 10),
       customerBaru(bulan),
       mutuData(bulan),

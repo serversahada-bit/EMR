@@ -45,9 +45,12 @@ async function ambilData(bulanDiminta?: string): Promise<Hasil> {
         ? bulanDiminta
         : bulanKini;
 
-    const [ringkas, tren, channel] = await Promise.all([
+    /* Tren 12 bulan TIDAK ditunggu: dikirim sebagai Promise supaya kartu
+       dan channel tampil dulu, grafik tren menyusul (lihat <Tunggu>).
+       .catch → null agar galat di tren tidak menggagalkan halaman. */
+    const tren = trenDashboard(bulan, 12).catch(() => null);
+    const [ringkas, channel] = await Promise.all([
       ringkasDashboard(bulan),
-      trenDashboard(bulan, 12),
       omsetPerChannel(bulan),
     ]);
 

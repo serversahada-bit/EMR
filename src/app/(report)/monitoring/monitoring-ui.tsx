@@ -2,6 +2,8 @@ import { Card, CardHead } from "@/components/Card";
 import { URUT_KANAL, type BarisMonitoring } from "@/data/monitoring-queries";
 import { formatCount, formatIDRPenuh, formatPercent } from "@/lib/format";
 
+import type { BarisCos } from "./ceo-charts";
+
 /* Dipakai bersama /monitoring dan /monitoring/kanal. Rumus rasio sama
    dengan tab GENERAL MONITORING di sheet Marketing Report. */
 
@@ -179,4 +181,80 @@ function Kpi({ label, nilai, catatan }: { label: string; nilai: React.ReactNode;
       <p className="text-[11px] text-muted">{catatan}</p>
     </div>
   );
+}
+
+/** Nama kanal untuk grafik ("MP" → "Marketplace"). */
+export function judulKanal(k: string): string {
+  return { "META x SHOPEE": "Meta×Shopee", TIKTOK: "TikTok", MP: "Marketplace", META: "Meta (iklan)", SNACK: "Snack", CRM: "CRM" }[k] ?? k;
+}
+
+/** Kepala kartu bernomor ala laporan CEO: (1) judul + keterangan. */
+export function Judul({ nomor, judul, sub }: { nomor: string; judul: string; sub: string }) {
+  return (
+    <header className="flex items-start gap-3 px-6 pb-4 pt-5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-bold text-surface">{nomor}</span>
+      <div>
+        <h2 className="text-[19px] font-semibold leading-tight text-ink">{judul}</h2>
+        <p className="mt-1 text-sm text-ink-2">{sub}</p>
+      </div>
+    </header>
+  );
+}
+
+/** Nama pendek kanal untuk keterangan kelompok ("Meta + CRM"). */
+const PENDEK: Record<string, string> = {
+  "META x SHOPEE": "Meta×Shopee",
+  TIKTOK: "TikTok",
+  MP: "MP",
+  META: "Meta",
+  SNACK: "Snack",
+  CRM: "CRM",
+};
+
+/**
+ * Baris grafik "Kanal mana yang paling boros?" — cara sheet menilai.
+ *
+ * Sheet hanya memberi batas COS untuk KELOMPOK, dihitung gabungan:
+ *  - SOSCOM     = (spend Meta + CRM) ÷ (omset Meta + CRM)            — sel F12/F93
+ *  - E-commerce = (spend Meta×Shopee + TikTok + MP) ÷ (omset TikTok + MP) — sel C12
+ * (Jan–Mar 2026 SOSCOM juga memuat Snack; anggota diambil dari `grup`.)
+ * Tiap kelompok diikuti kanal anggotanya TANPA batas: sheet tidak memberi
+ * batas per kanal, dan membandingkan Meta sendirian (153%) dengan batas
+ * SOSCOM (34,9%) tidak sesuai cara sheet menilai.
+ *
+ * Kanal yang omsetnya 0 (Meta×Shopee) tidak punya COS sendiri, tetapi
+ * biayanya tetap masuk kelompok — persis rumus sheet.
+ * Bulan tanpa batas kelompok (Jan–Mar) memakai baris "Total" dengan batas
+ * COS total supaya tetap ada pembanding.
+ */
+export function barisCosKelompok(blok: Blok): BarisCos[] {
+  const tot = blok.total;
+  const kelompok = [
+    { id: "SOSCOM", label: "SOSCOM", grup: "SOSCOM", batas: tot?.targetCosSoscom ?? null },
+    { id: "ECOMMERCE", label: "E-commerce", grup: "ECOMMERCE", batas: tot?.targetCosEcom ?? null },
+  ];
+  const hasil: BarisCos[] = [];
+  if (kelompok.every((k) => k.batas === null) && tot?.targetCos != null) {
+    const c = bagi(tot.spend, tot.omset);
+    if (c !== null) hasil.push({ id: "TOTAL", label: "Total", sub: "semua kanal", cos: c, batas: tot.targetCos, jenis: "grup" });
+  }
+  for (const k of kelompok) {
+    const anggota = blok.kanal.filter((r) => r.grup === k.grup && ((r.spend ?? 0) > 0 || (r.omset ?? 0) > 0));
+    const cos = bagi(sum(anggota, (r) => r.spend), sum(anggota, (r) => r.omset));
+    if (cos === null) continue;
+    hasil.push({
+      id: k.id,
+      label: k.label,
+      sub: anggota.map((r) => PENDEK[r.kanal] ?? r.kanal).join(" + "),
+      cos,
+      batas: k.batas,
+      jenis: "grup",
+    });
+    anggota
+      .filter((r) => (r.omset ?? 0) > 0)
+      .map((r) => ({ id: `${k.id}:${r.kanal}`, label: judulKanal(r.kanal), cos: (r.spend ?? 0) / (r.omset as number) }))
+      .sort((a, b) => a.cos - b.cos)
+      .forEach((r) => hasil.push({ ...r, batas: null, jenis: "anak" }));
+  }
+  return hasil;
 }

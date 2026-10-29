@@ -92,7 +92,12 @@ export interface BarisCos {
   id: string;
   label: string;
   cos: number;
+  /** null = tidak ada batas → batang netral, tanpa status aman/lewat. */
   batas: number | null;
+  /** "grup" = baris kelompok (tebal, ada `sub`); "anak" = kanal anggotanya. */
+  jenis?: "grup" | "anak";
+  /** Baris kedua kecil di bawah label, mis. "Meta + CRM". */
+  sub?: string;
 }
 
 /**
@@ -100,10 +105,21 @@ export interface BarisCos {
  * Sumbu dipotong di 2× batas terbesar supaya satu kanal ekstrem (META 150%+)
  * tidak membuat kanal lain tak terbaca; yang terpotong diberi tanda ▶.
  */
+/**
+ * COS per kelompok kanal dibanding batasnya, dengan kanal anggotanya di
+ * bawah tiap kelompok. Sheet hanya memberi batas untuk KELOMPOK (SOSCOM =
+ * Meta + CRM, E-commerce = Meta×Shopee + TikTok + MP), bukan per kanal —
+ * jadi kanal anggota digambar netral, tanpa garis batas dan tanpa status.
+ * Dulu baris tanpa batas otomatis berlabel "✓ aman" hijau; Meta 153% pun
+ * tampak aman.
+ */
 export function BarCos({ rows }: { rows: BarisCos[] }) {
   const [ref, width] = useMeasure<HTMLDivElement>();
   const [aktif, setAktif] = useState<string | null>(null);
-  const tinggiBaris = 52, tinggiBatang = 26, kiri = 110, kanan = 190;
+  const tinggi = (r: BarisCos) => (r.jenis === "anak" ? 40 : 56);
+  const ys = rows.reduce<number[]>((a, r, i) => [...a, i === 0 ? 0 : a[i - 1] + tinggi(rows[i - 1])], []);
+  const total = rows.reduce((a, r) => a + tinggi(r), 0);
+  const kiri = 190, kanan = 170;
   const plotW = Math.max(0, width - kiri - kanan);
   const batasMaks = Math.max(...rows.map((r) => r.batas ?? 0), 0.4);
   const potong = Math.max(batasMaks * 2, Math.min(Math.max(...rows.map((r) => r.cos)), batasMaks * 2));
@@ -111,39 +127,61 @@ export function BarCos({ rows }: { rows: BarisCos[] }) {
   return (
     <div ref={ref} className="relative w-full">
       {width > 0 ? (
-        <svg width={width} height={rows.length * tinggiBaris} role="img" aria-label="COS per kanal dibanding batas">
+        <svg width={width} height={total} role="img" aria-label="COS per kelompok kanal dibanding batas">
           {rows.map((r, i) => {
-            const y = i * tinggiBaris;
-            const aman = r.batas === null || r.cos <= r.batas;
+            const y = ys[i];
+            const h = tinggi(r);
+            const anak = r.jenis === "anak";
+            const adaBatas = r.batas !== null;
+            const aman = adaBatas && r.cos <= (r.batas as number);
             const terpotong = r.cos > potong;
             const w = xOf(r.cos) - kiri;
+            const tb = anak ? 16 : 26;
+            const warna = !adaBatas ? "var(--ink-muted)" : aman ? "var(--good)" : "var(--critical)";
             return (
               <g key={r.id} opacity={aktif && aktif !== r.id ? 0.45 : 1}
                  onMouseEnter={() => setAktif(r.id)} onMouseLeave={() => setAktif(null)}>
-                <rect x={0} y={y} width={width} height={tinggiBaris} fill="transparent" />
-                <text x={kiri - 14} y={y + tinggiBaris / 2} textAnchor="end" dominantBaseline="middle"
-                      fontSize={UKURAN.label} fontWeight={600} fill="var(--ink)">{r.label}</text>
-                <path d={barPath(kiri, y + (tinggiBaris - tinggiBatang) / 2, Math.max(w, 2), tinggiBatang, 4, terpotong ? "none" : "right")}
-                      fill={aman ? "var(--good)" : "var(--critical)"} />
-                {r.batas !== null ? (
-                  <line x1={xOf(r.batas)} x2={xOf(r.batas)} y1={y + 6} y2={y + tinggiBaris - 6}
+                <rect x={0} y={y} width={width} height={h} fill="transparent" />
+                {anak ? (
+                  <text x={kiri - 14} y={y + h / 2} textAnchor="end" dominantBaseline="middle"
+                        fontSize={UKURAN.label - 2} fontWeight={500} fill="var(--ink-2)">{r.label}</text>
+                ) : (
+                  <>
+                    <text x={kiri - 14} y={y + h / 2 - (r.sub ? 8 : 0)} textAnchor="end" dominantBaseline="middle"
+                          fontSize={UKURAN.label} fontWeight={700} fill="var(--ink)">{r.label}</text>
+                    {r.sub ? (
+                      <text x={kiri - 14} y={y + h / 2 + 11} textAnchor="end" dominantBaseline="middle"
+                            fontSize={12} fill="var(--ink-muted)">{r.sub}</text>
+                    ) : null}
+                  </>
+                )}
+                <path d={barPath(kiri, y + (h - tb) / 2, Math.max(w, 2), tb, 4, terpotong ? "none" : "right")}
+                      fill={warna} opacity={anak ? 0.55 : 1} />
+                {adaBatas ? (
+                  <line x1={xOf(r.batas as number)} x2={xOf(r.batas as number)} y1={y + 6} y2={y + h - 6}
                         stroke="var(--ink)" strokeWidth={2} strokeDasharray="4 3" />
                 ) : null}
-                <text x={xOf(r.cos) + 12} y={y + tinggiBaris / 2} dominantBaseline="middle" fontSize={UKURAN.nilai} fill="var(--ink)">
-                  <tspan fontWeight={700}>{`${terpotong ? "▶ " : ""}${fmtPersen(r.cos)}`}</tspan>
-                  <tspan fill={aman ? "var(--good-fg)" : "var(--critical-fg)"} fontWeight={600}>{aman ? "  ✓ aman" : "  ✕ lewat"}</tspan>
+                <text x={xOf(r.cos) + 12} y={y + h / 2} dominantBaseline="middle"
+                      fontSize={anak ? UKURAN.nilai - 2 : UKURAN.nilai} fill={anak ? "var(--ink-2)" : "var(--ink)"}>
+                  <tspan fontWeight={anak ? 600 : 700}>{`${terpotong ? "▶ " : ""}${fmtPersen(r.cos)}`}</tspan>
+                  {adaBatas ? (
+                    <tspan fill={aman ? "var(--good-fg)" : "var(--critical-fg)"} fontWeight={600}>{aman ? "  ✓ aman" : "  ✕ lewat"}</tspan>
+                  ) : null}
                 </text>
               </g>
             );
           })}
         </svg>
-      ) : <div style={{ height: rows.length * tinggiBaris }} />}
+      ) : <div style={{ height: total }} />}
       {aktif ? (() => {
         const r = rows.find((x) => x.id === aktif)!;
-        return <Tooltip x={Math.min(width - 120, xOf(r.cos))} y={rows.indexOf(r) * tinggiBaris + 8}
-                        teks={`${r.label}: COS ${fmtPersen(r.cos)}${r.batas !== null ? ` · batas ≤ ${fmtPersen(r.batas)}` : ""}`} />;
+        return <Tooltip x={Math.min(width - 120, xOf(r.cos))} y={ys[rows.indexOf(r)] + 8}
+                        teks={`${r.label}${r.sub ? ` (${r.sub})` : ""}: COS ${fmtPersen(r.cos)}${r.batas !== null ? ` · batas ≤ ${fmtPersen(r.batas)}` : " · tanpa batas"}`} />;
       })() : null}
-      <p className="mt-2 text-sm text-ink-2">Garis putus-putus = batas COS kanal itu.</p>
+      <p className="mt-2 text-sm text-ink-2">
+        Garis putus-putus = batas COS kelompok dari sheet. Kanal di bawahnya ditampilkan tanpa batas — sheet hanya
+        memberi batas per kelompok.
+      </p>
     </div>
   );
 }

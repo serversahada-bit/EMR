@@ -285,31 +285,17 @@ export async function trenDashboard(
   const awal = `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}-01`;
   const [, akhir] = batasBulan(bulan);
 
-  const [omset, iklan] = await Promise.all([
-    query<Record<string, unknown>>(
-      `SELECT DATE_FORMAT(t.tanggal_proses, '%Y-%m') AS bulan,
-              SUM(${OMSET}) AS omset,
-              MAX(t.tanggal_proses) AS hari_akhir
-       FROM data_transaksi t
-       WHERE t.tanggal_proses >= ? AND t.tanggal_proses < ?
-       GROUP BY bulan`,
-      [awal, akhir],
-    ),
-    query<Record<string, unknown>>(
-      /* Group berdasarkan ekspresi penuh, bukan alias `bulan`: tabel COS
-         punya kolom asli bernama `bulan`, dan MySQL menafsirkan
-         `GROUP BY bulan` sebagai kolom itu — bukan alias di SELECT. */
-      `SELECT DATE_FORMAT(tanggal, '%Y-%m') AS bulan,
-              SUM(spend_total) AS spend,
-              MAX(CASE WHEN ${ADA_SPEND} THEN tanggal END) AS hari_akhir
-       ${SPEND_COS}
-       GROUP BY DATE_FORMAT(tanggal, '%Y-%m')`,
-      [awal, akhir],
-    ),
+  /* Bulan-bulan SEBELUM bulan yang dipilih tidak berubah lagi, jadi
+     disimpan 30 menit; bulan yang dipilih (biasanya berjalan) selalu
+     dihitung langsung. Menjumlah ulang 12 bulan transaksi butuh ±5 dtk
+     karena kolom harganya berupa teks; satu bulan ±0,1 dtk. */
+  const awalBulanIni = `${bulan}-01`;
+  const [lampau, kini] = await Promise.all([
+    simpanTren(`${awal}|${awalBulanIni}`, () => trenRentang(awal, awalBulanIni)),
+    trenRentang(awalBulanIni, akhir),
   ]);
-
-  const perOmset = new Map(omset.map((r) => [String(r.bulan), r]));
-  const perSpend = new Map(iklan.map((r) => [String(r.bulan), r]));
+  const perOmset = new Map([...lampau.omset, ...kini.omset]);
+  const perSpend = new Map([...lampau.spend, ...kini.spend]);
 
   /* Deret dirakit dari daftar bulan, bukan dari hasil query: bulan yang
      tidak punya transaksi harus tetap muncul sebagai nol agar grafik
@@ -336,6 +322,54 @@ export async function trenDashboard(
       };
     }),
   );
+}
+
+/** Omset & biaya per bulan dalam [awal, akhir) — bahan trenDashboard. */
+async function trenRentang(
+  awal: string,
+  akhir: string,
+): Promise<{ omset: Map<string, Record<string, unknown>>; spend: Map<string, Record<string, unknown>> }> {
+  if (awal >= akhir) return { omset: new Map(), spend: new Map() };
+  const [omset, iklan] = await Promise.all([
+    query<Record<string, unknown>>(
+      `SELECT DATE_FORMAT(t.tanggal_proses, '%Y-%m') AS bulan,
+              SUM(${OMSET}) AS omset,
+              MAX(t.tanggal_proses) AS hari_akhir
+       FROM data_transaksi t
+       WHERE t.tanggal_proses >= ? AND t.tanggal_proses < ?
+       GROUP BY bulan`,
+      [awal, akhir],
+    ),
+    query<Record<string, unknown>>(
+      /* Group berdasarkan ekspresi penuh, bukan alias `bulan`: tabel COS
+         punya kolom asli bernama `bulan`, dan MySQL menafsirkan
+         `GROUP BY bulan` sebagai kolom itu — bukan alias di SELECT. */
+      `SELECT DATE_FORMAT(tanggal, '%Y-%m') AS bulan,
+              SUM(spend_total) AS spend,
+              MAX(CASE WHEN ${ADA_SPEND} THEN tanggal END) AS hari_akhir
+       ${SPEND_COS}
+       GROUP BY DATE_FORMAT(tanggal, '%Y-%m')`,
+      [awal, akhir],
+    ),
+  ]);
+  return {
+    omset: new Map(omset.map((r) => [String(r.bulan), r])),
+    spend: new Map(iklan.map((r) => [String(r.bulan), r])),
+  };
+}
+
+const memoTren = new Map<string, { pada: number; nilai: ReturnType<typeof trenRentang> }>();
+
+/** Simpan hasil bulan-bulan lampau 30 menit (Promise disimpan agar
+ *  beberapa pengguna yang membuka bersamaan memakai satu query). */
+function simpanTren(kunci: string, ambil: () => ReturnType<typeof trenRentang>): ReturnType<typeof trenRentang> {
+  const ada = memoTren.get(kunci);
+  if (ada && Date.now() - ada.pada < 30 * 60_000) return ada.nilai;
+  if (memoTren.size > 40) memoTren.delete(memoTren.keys().next().value as string);
+  const nilai = ambil();
+  memoTren.set(kunci, { pada: Date.now(), nilai });
+  nilai.catch(() => memoTren.delete(kunci));
+  return nilai;
 }
 
 export async function omsetPerChannel(

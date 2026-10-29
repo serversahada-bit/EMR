@@ -9,6 +9,7 @@ import { LineChart } from "@/components/LineChart";
 import { TintedList } from "@/components/Lists";
 import { MonthPicker, labelBulan } from "@/components/MonthPicker";
 import { PageHead } from "@/components/PageHead";
+import { KerangkaGrafik, Tunggu } from "@/components/Tunggu";
 import { DeltaPill } from "@/components/Pill";
 import { StackedBarChart } from "@/components/StackedBarChart";
 import {
@@ -42,7 +43,8 @@ export interface OmsetData {
   bulanSebelum: string | null;
   /** Bulan pembanding dihitung s/d hari ini saja; null = bulan penuh. */
   hariPembanding: number | null;
-  tren: OmsetBulan[];
+  /** Promise: tren 12 bulan menyusul setelah kartu tampil. null = gagal. */
+  tren: Promise<OmsetBulan[] | null>;
   perAdv: OmsetPerAdv[];
   customerBaru: number;
   customerBaruSebelum: number | null;
@@ -71,11 +73,6 @@ export function OmsetView({ data }: { data: OmsetData }) {
   const hariKategori = harian.map((row) => ({
     label: row.hari,
     longLabel: row.hari + " " + labelBulan(bulan),
-  }));
-
-  const trenKategori = tren.map((row) => ({
-    label: labelBulan(row.bulan).slice(0, 3),
-    longLabel: labelBulan(row.bulan),
   }));
 
   /* "1–23 September 2026" saat bulan ini belum selesai — sama dengan
@@ -149,36 +146,87 @@ export function OmsetView({ data }: { data: OmsetData }) {
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          label="Omset"
-          value={formatIDRPenuh(ringkas.omset)}
-          icon={IconCoins}
-          tint="var(--tint-s1)"
-          color="var(--s1)"
-          delta={delta(ringkas.omset, ringkasSebelum?.omset)}
-          comparison={pembanding}
-          trend={tren.map((row) => row.omset)}
-        />
-        <KpiCard
-          label="Transaksi"
-          value={formatNumber(ringkas.transaksi)}
-          icon={IconDocument}
-          tint="var(--tint-s3)"
-          color="var(--s3)"
-          delta={delta(ringkas.transaksi, ringkasSebelum?.transaksi)}
-          comparison={pembanding}
-          trend={tren.map((row) => row.transaksi)}
-        />
-        <KpiCard
-          label="Barang terkirim"
-          value={formatNumber(ringkas.barang)}
-          icon={IconWallet}
-          tint="var(--tint-s4)"
-          color="var(--s4)"
-          delta={delta(ringkas.barang, ringkasSebelum?.barang)}
-          comparison={pembanding}
-          trend={tren.map((row) => row.barang)}
-        />
+        <Tunggu
+          janji={tren}
+          cadangan={
+                <KpiCard
+                  label="Omset"
+                  value={formatIDRPenuh(ringkas.omset)}
+                  icon={IconCoins}
+                  tint="var(--tint-s1)"
+                  color="var(--s1)"
+                  delta={delta(ringkas.omset, ringkasSebelum?.omset)}
+                  comparison={pembanding}
+                />
+          }
+        >
+          {(t) => (
+                <KpiCard
+                  label="Omset"
+                  value={formatIDRPenuh(ringkas.omset)}
+                  icon={IconCoins}
+                  tint="var(--tint-s1)"
+                  color="var(--s1)"
+                  delta={delta(ringkas.omset, ringkasSebelum?.omset)}
+                  comparison={pembanding}
+                  trend={t?.map((row) => row.omset)}
+                />
+          )}
+        </Tunggu>
+        <Tunggu
+          janji={tren}
+          cadangan={
+                <KpiCard
+                  label="Transaksi"
+                  value={formatNumber(ringkas.transaksi)}
+                  icon={IconDocument}
+                  tint="var(--tint-s3)"
+                  color="var(--s3)"
+                  delta={delta(ringkas.transaksi, ringkasSebelum?.transaksi)}
+                  comparison={pembanding}
+                />
+          }
+        >
+          {(t) => (
+                <KpiCard
+                  label="Transaksi"
+                  value={formatNumber(ringkas.transaksi)}
+                  icon={IconDocument}
+                  tint="var(--tint-s3)"
+                  color="var(--s3)"
+                  delta={delta(ringkas.transaksi, ringkasSebelum?.transaksi)}
+                  comparison={pembanding}
+                  trend={t?.map((row) => row.transaksi)}
+                />
+          )}
+        </Tunggu>
+        <Tunggu
+          janji={tren}
+          cadangan={
+                <KpiCard
+                  label="Barang terkirim"
+                  value={formatNumber(ringkas.barang)}
+                  icon={IconWallet}
+                  tint="var(--tint-s4)"
+                  color="var(--s4)"
+                  delta={delta(ringkas.barang, ringkasSebelum?.barang)}
+                  comparison={pembanding}
+                />
+          }
+        >
+          {(t) => (
+                <KpiCard
+                  label="Barang terkirim"
+                  value={formatNumber(ringkas.barang)}
+                  icon={IconWallet}
+                  tint="var(--tint-s4)"
+                  color="var(--s4)"
+                  delta={delta(ringkas.barang, ringkasSebelum?.barang)}
+                  comparison={pembanding}
+                  trend={t?.map((row) => row.barang)}
+                />
+          )}
+        </Tunggu>
         <KpiCard
           label="Customer baru"
           value={formatNumber(customerBaru)}
@@ -277,37 +325,48 @@ export function OmsetView({ data }: { data: OmsetData }) {
           </dl>
         </Card>
 
-        <ChartFrame
-          className="lg:col-span-7"
-          title="Tren omset bulanan"
-          subtitle={tren.length + " bulan terakhir"}
-          chart={
-            <LineChart
-              categories={trenKategori}
-              height={196}
-              zeroBased
-              formatValue={(v) => formatIDR(v)}
-              formatTick={formatTickCompact}
-              series={[
-                {
-                  id: "omset",
-                  label: "Omset",
-                  color: "var(--s1)",
-                  values: tren.map((row) => row.omset),
-                  labelEnd: true,
-                  area: true,
-                },
-              ]}
-            />
+        <Tunggu
+          janji={tren}
+          cadangan={<KerangkaGrafik className="lg:col-span-7" judul="Tren omset bulanan" sub="12 bulan terakhir" tinggi={196} />}
+        >
+          {(t) =>
+            t ? (
+                <ChartFrame
+                  className="lg:col-span-7"
+                  title="Tren omset bulanan"
+                  subtitle={t.length + " bulan terakhir"}
+                  chart={
+                    <LineChart
+                      categories={t.map((row) => ({ label: labelBulan(row.bulan).slice(0, 3), longLabel: labelBulan(row.bulan) }))}
+                      height={196}
+                      zeroBased
+                      formatValue={(v) => formatIDR(v)}
+                      formatTick={formatTickCompact}
+                      series={[
+                        {
+                          id: "omset",
+                          label: "Omset",
+                          color: "var(--s1)",
+                          values: t.map((row) => row.omset),
+                          labelEnd: true,
+                          area: true,
+                        },
+                      ]}
+                    />
+                  }
+                  table={
+                    <DataTable
+                      rows={t}
+                      rowKey={(row) => row.bulan}
+                      columns={kolomTren}
+                    />
+                  }
+                />
+            ) : (
+              <Card className="p-5 text-sm text-ink-2 lg:col-span-7">Tren omset gagal dimuat. Coba muat ulang halaman.</Card>
+            )
           }
-          table={
-            <DataTable
-              rows={tren}
-              rowKey={(row) => row.bulan}
-              columns={kolomTren}
-            />
-          }
-        />
+        </Tunggu>
 
         <ChartFrame
           className="lg:col-span-5"

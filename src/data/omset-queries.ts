@@ -49,7 +49,7 @@ import { query } from "./db";
  * biasa yang tidak bisa dibedakan dari rupiah penuh. Unitnya tidak dapat
  * disimpulkan dari format, jadi menebak di sini akan merusak baris lain.
  */
-function money(column: string): string {
+export function money(column: string): string {
   const ribuan = `${column} REGEXP '^-?[0-9]{1,3}([.][0-9]{3})+(,[0-9]+)?$'`;
   const bersih = `REPLACE(REPLACE(${column}, '.', ''), ',', '.')`;
   return `COALESCE(CASE
@@ -59,7 +59,7 @@ function money(column: string): string {
 }
 
 /** Satu kolom jumlah barang VARCHAR → DECIMAL. */
-function qty(column: string): string {
+export function qty(column: string): string {
   return `COALESCE(CAST(NULLIF(${column}, '') AS DECIMAL(20, 0)), 0)`;
 }
 
@@ -74,7 +74,7 @@ function qty(column: string): string {
  * disengaja, dan memasang ABS() justru menggeser omset ~Rp 194.000.
  */
 export const OMSET = `(${money("total_harga")} + ${money("ongkir")} + ${money("fee")} - ${money("diskon")})`;
-const BARANG = `(${qty("jumlah_1")} + ${qty("jumlah_2")} + ${qty("jumlah_3")})`;
+export const BARANG = `(${qty("jumlah_1")} + ${qty("jumlah_2")} + ${qty("jumlah_3")})`;
 
 /** "2026-09" → ["2026-09-01", "2026-10-01"] (batas atas eksklusif). */
 export function batasBulan(bulan: string): [string, string] {

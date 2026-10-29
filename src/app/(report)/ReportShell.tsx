@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore, type ReactNode } from "react";
 
-import { FilterBar } from "@/components/FilterBar";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { meta } from "@/data/report";
@@ -23,9 +22,10 @@ export interface PenggunaTampil {
 }
 
 /**
- * Cangkang laporan: sidebar, bilah atas, dan satu baris filter yang
- * menaungi semua halaman. Layout tidak ikut dilepas saat berpindah
- * rute, jadi pilihan periode dan unit bisnis bertahan.
+ * Cangkang laporan: sidebar dan bilah atas yang menaungi semua halaman.
+ * Bar filter Periode / Unit bisnis dihapus atas permintaan pengguna
+ * (26 Okt 2026): halaman data riil punya pilihan bulannya sendiri, dan
+ * bar itu hanya mengubah halaman data contoh yang sudah disembunyikan.
  *
  * Pemeriksaan login ada di layout.tsx (server) yang membungkus ini.
  */
@@ -83,6 +83,14 @@ const RUTE_DATA_RIIL = [
   "/sync",
   "/setingan/produk",
   "/setingan/user",
+  "/snack",
+  "/snack/spend-iklan",
+  "/mutu-data",
+  "/spreadsheet",
+  "/rekap",
+  "/dashboard/penjualan",
+  "/dashboard/produk",
+  "/dashboard/wilayah",
 ];
 
 function Shell({
@@ -95,38 +103,11 @@ function Shell({
   const pathname = usePathname();
   const dataRiil = RUTE_DATA_RIIL.includes(pathname);
 
-  const {
-    periodId,
-    divisionId,
-    query,
-    setPeriodId,
-    setDivisionId,
-    setQuery,
-    period,
-    matchedDivisions,
-    matchedInitiatives,
-  } = useReport();
+  const { query, setQuery, matchedDivisions, matchedInitiatives } = useReport();
 
   return (
     <>
       <TopBar query={query} onQueryChange={setQuery} pengguna={pengguna} />
-
-      {/* Satu baris filter untuk halaman yang memakai data contoh */}
-      {dataRiil ? null : (
-        <div className="sticky top-14 z-10 border-b border-hairline bg-page/95 px-4 py-3 backdrop-blur sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <FilterBar
-              periodId={periodId}
-              divisionId={divisionId}
-              onPeriodChange={setPeriodId}
-              onDivisionChange={setDivisionId}
-            />
-            <p className="text-[11px] text-muted">
-              {period.caption} · data per {meta.asOf}
-            </p>
-          </div>
-        </div>
-      )}
 
       <main className="px-4 pb-10 pt-6 sm:px-6">
         {pengguna.harusGanti && pathname !== "/setingan/user" ? (
