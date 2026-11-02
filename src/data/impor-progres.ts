@@ -19,8 +19,9 @@ import { query } from "./db";
      IMPOR_PROGRES_DIR = folder yang berisi impor_progres.py
                          (bawaan: skrip/impor di repo ini)
      IMPOR_PYTHON      = perintah python (bawaan: venv skrip/impor/.venv
-                         yang dipasang nixpacks.toml, kalau ada; selain
-                         itu "python" di Windows, "python3" di Linux)
+                         kalau ada; selain itu "python" di Windows,
+                         "python3" di Linux — di server Coolify dipasang
+                         lewat apt oleh railpack.json)
 
    Koneksi DB diteruskan lewat variabel lingkungan (`--env-proses`),
    memakai nilai bawaan yang sama dengan db.ts — sehingga impor selalu
