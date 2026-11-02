@@ -1,6 +1,7 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 import { query } from "./db";
@@ -14,9 +15,12 @@ import { query } from "./db";
    blok tanggal ganda, sheet beku, baris hantu MP, dsb.) sudah ditangani
    di sana dan sudah diuji ke isi DB, jadi satu pengurai untuk dua jalur.
 
-   Lokasi skrip diatur lewat .env.local:
+   Lokasi skrip (opsional, lewat .env.local):
      IMPOR_PROGRES_DIR = folder yang berisi impor_progres.py
-     IMPOR_PYTHON      = perintah python (bawaan: "python")
+                         (bawaan: skrip/impor di repo ini)
+     IMPOR_PYTHON      = perintah python (bawaan: venv skrip/impor/.venv
+                         yang dipasang nixpacks.toml, kalau ada; selain
+                         itu "python" di Windows, "python3" di Linux)
 
    Koneksi DB diteruskan lewat variabel lingkungan (`--env-proses`),
    memakai nilai bawaan yang sama dengan db.ts — sehingga impor selalu
@@ -92,18 +96,34 @@ export function targetDb(): TargetDb {
   return { host: e.DB_HOST, nama: e.DB_NAME };
 }
 
+/** Folder skrip: dari env, atau salinan di repo (skrip/impor). */
+function folderSkrip(): string | null {
+  const folder = process.env.IMPOR_PROGRES_DIR ?? path.join(process.cwd(), "skrip", "impor");
+  return existsSync(path.join(folder, "impor_progres.py")) ? folder : null;
+}
+
+function perintahPython(folder: string): string {
+  if (process.env.IMPOR_PYTHON) return process.env.IMPOR_PYTHON;
+  const venv =
+    process.platform === "win32"
+      ? path.join(folder, ".venv", "Scripts", "python.exe")
+      : path.join(folder, ".venv", "bin", "python");
+  if (existsSync(venv)) return venv;
+  return process.platform === "win32" ? "python" : "python3";
+}
+
 export function skripSiap(): boolean {
-  return Boolean(process.env.IMPOR_PROGRES_DIR);
+  return folderSkrip() !== null;
 }
 
 export async function jalankanImpor(
   links: string[],
   simpan: boolean,
 ): Promise<HasilImpor> {
-  const folder = process.env.IMPOR_PROGRES_DIR;
+  const folder = folderSkrip();
   if (!folder) {
     throw new Error(
-      "IMPOR_PROGRES_DIR belum diisi di .env.local — isi dengan folder yang berisi impor_progres.py.",
+      "Skrip impor_progres.py tidak ditemukan — isi IMPOR_PROGRES_DIR di .env.local atau pastikan folder skrip/impor ada.",
     );
   }
 
@@ -123,7 +143,7 @@ export async function jalankanImpor(
   const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>(
     (resolve, reject) => {
       execFile(
-        process.env.IMPOR_PYTHON ?? "python",
+        perintahPython(folder),
         argumen,
         {
           cwd: folder,

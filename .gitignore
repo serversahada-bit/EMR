@@ -43,3 +43,8 @@ next-env.d.ts
 
 # kunci tanda tangan sesi login (dibuat otomatis bila AUTH_SECRET kosong)
 .emr-secret
+
+# skrip impor (Python)
+/skrip/impor/.venv/
+/skrip/impor/impor_unduhan/
+__pycache__/

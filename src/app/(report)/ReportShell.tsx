@@ -91,6 +91,7 @@ const RUTE_DATA_RIIL = [
   "/dashboard/penjualan",
   "/dashboard/produk",
   "/dashboard/wilayah",
+  "/import",
 ];
 
 function Shell({

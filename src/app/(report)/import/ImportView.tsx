@@ -116,11 +116,12 @@ export function ImportView({
       {!skripSiap ? (
         <Kotak jenis="critical">
           <strong className="font-semibold text-ink">
-            Skrip impor belum diatur.
+            Skrip impor tidak ditemukan.
           </strong>{" "}
-          Tambahkan <code className="text-[11px]">IMPOR_PROGRES_DIR</code>{" "}
-          (folder berisi <code className="text-[11px]">impor_progres.py</code>)
-          di .env.local lalu jalankan ulang <code className="text-[11px]">npm run dev</code>.
+          Folder <code className="text-[11px]">skrip/impor</code> tidak ada di
+          server ini. Deploy ulang dari repo, atau isi{" "}
+          <code className="text-[11px]">IMPOR_PROGRES_DIR</code> (folder berisi{" "}
+          <code className="text-[11px]">impor_progres.py</code>).
         </Kotak>
       ) : null}
 
